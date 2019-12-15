@@ -1,3 +1,10 @@
+/*
+--------------------------NOTES---------------------------------
+Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
+
+
+
+*/
 // defines
 #define DEBUG
 //#define SET_RTC
@@ -23,6 +30,14 @@ int TimeD = 0;
 int TimeH = 0;
 int TimeM = 0;
 int TimeS = 0;
+
+//var for LEDs
+int StartLedHourW = 14; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedMinuteW = 0;
+int EndLedHourW = 20;
+int EndLedMinuteW = 0; //zhasne poslední LED, postupnw zhasnou vsechny
+int StepLedW = 5; //in minutes
+
 
 //time variable
 int DEBUG_TimeS = 0;
