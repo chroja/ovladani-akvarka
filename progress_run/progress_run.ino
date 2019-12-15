@@ -11,8 +11,8 @@
 int SetRtcY = 2019;
 int SetRtcMo = 12;
 int SetRtcD = 15;
-int SetRtcH = 20;
-int SetRtcM = 40;
+int SetRtcH = 21;
+int SetRtcM = 8;
 int SetRtcS = 0;
 
 // var for date
@@ -55,8 +55,6 @@ void setup () {
 }
 
 void loop () {
-
-  Serial.print(':');
 
   GetTime();
 
