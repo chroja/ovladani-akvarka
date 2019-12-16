@@ -36,7 +36,20 @@ int StartLedHourW = 14; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int EndLedHourW = 20;
 int EndLedMinuteW = 0; //zhasne poslední LED, postupnw zhasnou vsechny
-int StepLedW = 5; //in minutes
+int SpeedLedW = 5; //in minutes
+int NumLedW = 6
+int NumLedWOn = 0;
+
+
+//variales led pin (W D22-D27)
+#define LedW1 22
+#define LedW2 23
+#define LedW3 24
+#define LedW4 25
+#define LedW5 26
+#define LedW6 27
+
+
 
 
 //time variable
@@ -67,17 +80,39 @@ void setup () {
   #ifdef SET_RTC
   SetRTC();
   #endif
+
+  initOutput();
+
 }
 
 void loop () {
 
   GetTime();
+  LedWOn();
+  //LedWOff();
 
 }
 
 void SetRTC(){
   //adjus time in RTC module
   DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
+}
+
+void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
+
+  pinMode(LedW1, OUTPUT);
+  digitlWrite(LedW1, LOW);
+  pinMode(LedW2, OUTPUT);
+  digitlWrite(LedW2, LOW);
+  pinMode(LedW3, OUTPUT);
+  digitlWrite(LedW3, LOW);
+  pinMode(LedW4, OUTPUT);
+  digitlWrite(LedW4, LOW);
+  pinMode(LedW5, OUTPUT);
+  digitlWrite(LedW5, LOW);
+  pinMode(LedW6, OUTPUT);
+  digitlWrite(LedW6, LOW);
+
 }
 
 void GetTime(){
@@ -110,6 +145,13 @@ void GetTime(){
       DEBUG_TimeS = TimeS;
     }
   #endif
+}
 
-
+void LedWOn(){
+  if(NumLedWOn < NumLedW){
+    int LedWOffset = ((NumLedWOn) * SpeedLedW);
+    int LedWOffsetMinute =  (StartLedMinuteW + LedWOffset) % 60;
+    int LedWOffseHour  = ((StartLedMinuteW + LedWOffset) / 60) + StartLedHourW;
+  }
+  if(((LedWOffseHour >= TimeH) && (LedWOffsetMinute >= TimeM)) && (((EndLedHourW*100) + EndLedMinuteW) <= ((TimeH * 100) + TimeM)))
 }
