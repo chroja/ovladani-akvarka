@@ -7,7 +7,8 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 */
 // defines
 #define DEBUG
-//#define SET_RTC
+#define SET_RTC
+#define DEBUG_W_LED
 
 //librlies
 #include <Wire.h>
@@ -17,10 +18,10 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 //for RTC
 int SetRtcY = 2019;
 int SetRtcMo = 12;
-int SetRtcD = 15;
-int SetRtcH = 21;
-int SetRtcM = 8;
-int SetRtcS = 0;
+int SetRtcD = 21;
+int SetRtcH = 12;
+int SetRtcM = 14;
+int SetRtcS = 50;
 
 // var for date
 int TimeY = 0;
@@ -30,16 +31,20 @@ int TimeD = 0;
 int TimeH = 0;
 int TimeM = 0;
 int TimeS = 0;
+int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 14; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 15; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
-int EndLedHourW = 20;
+int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
+int EndLedHourW = 16;
 int EndLedMinuteW = 0; //zhasne poslední LED, postupnw zhasnou vsechny
-int SpeedLedW = 5; //in minutes
-int NumLedW = 6
+int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
+int SpeedLedW = 3; //in minutes
+int NumLedW = 6;
 int NumLedWOn = 0;
-
+byte StatusLedStrip = 0; //status 0 = unknown, 1 = min, 2 = step; 3 = max
+int OldNumLedWOffset;
 
 //variales led pin (W D22-D27)
 #define LedW1 22
@@ -83,36 +88,96 @@ void setup () {
 
   initOutput();
 
+  #ifdef DEBUG_W_LED
+  DebugWLED();
+  #endif
+
 }
 
 void loop () {
 
   GetTime();
   LedWOn();
-  //LedWOff();
+  LedWOff();
+  #ifdef DEBUG_W_LED
+  if (TimeHM == 1620){
+    SetRTC();
+  }
+  #endif
 
 }
 
 void SetRTC(){
   //adjus time in RTC module
   DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
+  #ifdef DEBUG
+    Serial.println();
+    Serial.println("---------- Time changed ----------");
+    Serial.print("New time is: ");
+    Serial.print(SetRtcH);
+    Serial.print(':');
+    Serial.print(SetRtcM);
+    Serial.print(':');
+    Serial.println(SetRtcS);
+  #endif
 }
 
 void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
 
   pinMode(LedW1, OUTPUT);
-  digitlWrite(LedW1, LOW);
+  digitalWrite(LedW1, LOW);
   pinMode(LedW2, OUTPUT);
-  digitlWrite(LedW2, LOW);
+  digitalWrite(LedW2, LOW);
   pinMode(LedW3, OUTPUT);
-  digitlWrite(LedW3, LOW);
+  digitalWrite(LedW3, LOW);
   pinMode(LedW4, OUTPUT);
-  digitlWrite(LedW4, LOW);
+  digitalWrite(LedW4, LOW);
   pinMode(LedW5, OUTPUT);
-  digitlWrite(LedW5, LOW);
+  digitalWrite(LedW5, LOW);
   pinMode(LedW6, OUTPUT);
-  digitlWrite(LedW6, LOW);
+  digitalWrite(LedW6, LOW);
 
+}
+
+void DebugWLED(){
+  #ifdef DEBUG_W_LED
+  Serial.println();
+  Serial.println("---------- Start test white led ----------");
+  digitalWrite(LedW1, HIGH);
+  delay (300);
+  digitalWrite(LedW2, HIGH);
+  delay (300);
+  digitalWrite(LedW3, HIGH);
+  delay (300);
+  digitalWrite(LedW4, HIGH);
+  delay (300);
+  digitalWrite(LedW5, HIGH);
+  delay (300);
+  digitalWrite(LedW6, HIGH);
+  delay (500);
+  digitalWrite(LedW1, LOW);
+  digitalWrite(LedW2, LOW);
+  digitalWrite(LedW3, LOW);
+  digitalWrite(LedW4, LOW);
+  digitalWrite(LedW5, LOW);
+  digitalWrite(LedW6, LOW);
+  delay(300);
+  digitalWrite(LedW1, HIGH);
+  digitalWrite(LedW2, HIGH);
+  digitalWrite(LedW3, HIGH);
+  digitalWrite(LedW4, HIGH);
+  digitalWrite(LedW5, HIGH);
+  digitalWrite(LedW6, HIGH);
+  delay(500);
+  digitalWrite(LedW1, LOW);
+  digitalWrite(LedW2, LOW);
+  digitalWrite(LedW3, LOW);
+  digitalWrite(LedW4, LOW);
+  digitalWrite(LedW5, LOW);
+  digitalWrite(LedW6, LOW);
+  Serial.println();
+  Serial.println("---------- End test white led ----------");
+  #endif
 }
 
 void GetTime(){
@@ -123,6 +188,8 @@ void GetTime(){
   TimeH = DateTime.hour();
   TimeM = DateTime.minute();
   TimeS = DateTime.second();
+  //TimeHM = (TimeH * 100) + TimeM;
+  TimeHM = (TimeM * 100) + TimeS;
 
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
@@ -141,6 +208,8 @@ void GetTime(){
       Serial.print(DateTime.month());
       Serial.print('.');
       Serial.print(DateTime.year());
+      Serial.print(" hodiny a minty (TimeHM): ");
+      Serial.print(TimeHM);
       Serial.println();
       DEBUG_TimeS = TimeS;
     }
@@ -148,10 +217,184 @@ void GetTime(){
 }
 
 void LedWOn(){
-  if(NumLedWOn < NumLedW){
-    int LedWOffset = ((NumLedWOn) * SpeedLedW);
-    int LedWOffsetMinute =  (StartLedMinuteW + LedWOffset) % 60;
-    int LedWOffseHour  = ((StartLedMinuteW + LedWOffset) / 60) + StartLedHourW;
+  int LedWOffset;
+  int LedWOffsetMinute;
+  int LedWOffseHour;
+  int LedWoffsetTime;
+  if((NumLedWOn <= NumLedW) && (StatusLedStrip != 3)){
+    LedWOffset = ((NumLedWOn) * SpeedLedW);
+    LedWOffsetMinute =  (StartLedMinuteW + LedWOffset) % 60;
+    LedWOffseHour  = ((StartLedMinuteW + LedWOffset) / 60) + StartLedHourW;
+    LedWoffsetTime = (LedWOffseHour * 100) + LedWOffsetMinute;
+
+    #ifdef DEBUG
+    if(OldNumLedWOffset != NumLedWOn){
+      Serial.print("Next strip in time: ");
+      Serial.println(LedWoffsetTime);
+      OldNumLedWOffset = NumLedWOn;
+    }
+    #endif
   }
-  if(((LedWOffseHour >= TimeH) && (LedWOffsetMinute >= TimeM)) && (((EndLedHourW*100) + EndLedMinuteW) <= ((TimeH * 100) + TimeM)))
+  if((LedWoffsetTime <= TimeHM) && (EndLedW >= TimeHM) && (StatusLedStrip != 3)){
+    if(NumLedWOn < NumLedW){
+      NumLedWOn = NumLedWOn + 1;
+
+      #ifdef DEBUG
+      Serial.print("NumLedWOn: ");
+      Serial.println(NumLedWOn);
+      #endif
+    }
+    else if (NumLedWOn == NumLedW){
+      StatusLedStrip = 3;
+
+      #ifdef DEBUG
+      Serial.print("Status led strip W change to: ");
+      Serial.println(StatusLedStrip);
+      #endif
+    }
+    else{
+      Serial.println("Error in function LedWOn. Loop is broken :(");
+    }
+
+    LedWSwitch();
+  }
+}
+
+void LedWOff(){
+  int LedWOffset;
+  int LedWOffsetMinute;
+  int LedWOffseHour;
+  int LedWoffsetTime;
+  if((NumLedWOn > 0) && (StatusLedStrip != 1)){
+    LedWOffset = ((NumLedW - NumLedWOn) * SpeedLedW);
+    LedWOffsetMinute =  (EndLedMinuteW + LedWOffset) % 60;
+    LedWOffseHour  = ((EndLedMinuteW + LedWOffset) / 60) + EndLedHourW;
+    LedWoffsetTime = (LedWOffseHour * 100) + LedWOffsetMinute;
+
+    #ifdef DEBUG
+    if(OldNumLedWOffset != NumLedWOn){
+      Serial.print("Next strip in time: ");
+      Serial.println(LedWoffsetTime);
+      OldNumLedWOffset = NumLedWOn;
+    }
+    #endif
+  }
+  if((LedWoffsetTime <= TimeHM) /*&& (StartLedW >= TimeHM)*/ && (StatusLedStrip != 1)){
+    if(NumLedWOn > 0){
+      NumLedWOn = NumLedWOn - 1;
+
+      #ifdef DEBUG
+      Serial.print("NumLedWOn: ");
+      Serial.println(NumLedWOn);
+      #endif
+    }
+    else if (NumLedWOn == 0){
+      StatusLedStrip = 1;
+
+      #ifdef DEBUG
+      Serial.print("Status led strip W change to: ");
+      Serial.println(StatusLedStrip);
+      #endif
+    }
+    else{
+      Serial.println("Error in function LedWOff. Loop is broken :(");
+    }
+
+    LedWSwitch();
+  }
+}
+
+
+
+void LedWSwitch() {
+  switch(NumLedWOn){
+    case 0:
+      digitalWrite(LedW1, LOW);
+      digitalWrite(LedW2, LOW);
+      digitalWrite(LedW3, LOW);
+      digitalWrite(LedW4, LOW);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("All white LED strip are off.");
+      #endif
+      break;
+    case 1:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, LOW);
+      digitalWrite(LedW3, LOW);
+      digitalWrite(LedW4, LOW);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("1 white LED strip is on");
+      #endif
+      break;
+    case 2:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, HIGH);
+      digitalWrite(LedW3, LOW);
+      digitalWrite(LedW4, LOW);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("1-2 white LED strip are on");
+      #endif
+      break;
+    case 3:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, HIGH);
+      digitalWrite(LedW3, HIGH);
+      digitalWrite(LedW4, LOW);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("1-3 white LED strip are on");
+      #endif
+      break;
+    case 4:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, HIGH);
+      digitalWrite(LedW3, HIGH);
+      digitalWrite(LedW4, HIGH);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("1-4 white LED strip are on");
+      #endif
+      break;
+    case 5:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, HIGH);
+      digitalWrite(LedW3, HIGH);
+      digitalWrite(LedW4, HIGH);
+      digitalWrite(LedW5, HIGH);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("1-5 white LED strip are on");
+      #endif
+      break;
+    case 6:
+      digitalWrite(LedW1, HIGH);
+      digitalWrite(LedW2, HIGH);
+      digitalWrite(LedW3, HIGH);
+      digitalWrite(LedW4, HIGH);
+      digitalWrite(LedW5, HIGH);
+      digitalWrite(LedW6, HIGH);
+      #ifdef DEBUG
+      Serial.println("1-6 white LED strip are on");
+      #endif
+      break;
+    default:
+      digitalWrite(LedW1, LOW);
+      digitalWrite(LedW2, LOW);
+      digitalWrite(LedW3, LOW);
+      digitalWrite(LedW4, LOW);
+      digitalWrite(LedW5, LOW);
+      digitalWrite(LedW6, LOW);
+      #ifdef DEBUG
+      Serial.println("All white LED strip are off. Case default!!");
+      #endif
+      break;
+  }
 }
