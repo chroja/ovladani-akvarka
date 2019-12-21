@@ -7,8 +7,9 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 */
 // defines
 #define DEBUG
-#define SET_RTC
-#define DEBUG_W_LED
+//#define SET_RTC
+//#define DEBUG_W_LED
+#define SAFETY_TEMP
 
 //librlies
 #include <Wire.h>
@@ -19,9 +20,9 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 int SetRtcY = 2019;
 int SetRtcMo = 12;
 int SetRtcD = 21;
-int SetRtcH = 12;
-int SetRtcM = 14;
-int SetRtcS = 50;
+int SetRtcH = 18;
+int SetRtcM = 33;
+int SetRtcS = 30;
 
 // var for date
 int TimeY = 0;
@@ -55,6 +56,9 @@ int OldNumLedWOffset;
 #define LedW6 27
 
 
+
+//temp
+#define TempPin 52
 
 
 //time variable
@@ -99,12 +103,8 @@ void loop () {
   GetTime();
   LedWOn();
   LedWOff();
-  #ifdef DEBUG_W_LED
-  if (TimeHM == 1620){
-    SetRTC();
-  }
-  #endif
 
+  SerialInfo();
 }
 
 void SetRTC(){
@@ -188,9 +188,9 @@ void GetTime(){
   TimeH = DateTime.hour();
   TimeM = DateTime.minute();
   TimeS = DateTime.second();
-  //TimeHM = (TimeH * 100) + TimeM;
-  TimeHM = (TimeM * 100) + TimeS;
-
+  TimeHM = (TimeH * 100) + TimeM;
+  //TimeHM = (TimeM * 100) + TimeS;
+/*
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
       Serial.println();
@@ -213,7 +213,7 @@ void GetTime(){
       Serial.println();
       DEBUG_TimeS = TimeS;
     }
-  #endif
+  #endif*/
 }
 
 void LedWOn(){
@@ -397,4 +397,17 @@ void LedWSwitch() {
       #endif
       break;
   }
+}
+
+void SerialInfo(){
+  #ifdef DEBUG
+    if(TimeS != DEBUG_TimeS){
+      Serial.println();
+      Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
+
+      DEBUG_TimeS = TimeS;
+    }
+
+
+  #endif
 }
