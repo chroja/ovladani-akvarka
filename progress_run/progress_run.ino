@@ -8,7 +8,7 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 // defines
 #define DEBUG
 //#define SET_RTC
-//#define DEBUG_W_LED
+//#define DEBUG_LED
 #define SAFETY_TEMP
 
 //librlies
@@ -35,13 +35,13 @@ int TimeS = 0;
 int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 15; // rozsviti se prni LED, postupne se budou zapinat dalsi
-int StartLedMinuteW = 0;
+int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedMinuteW = 24;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 16;
+int EndLedHourW = 23;
 int EndLedMinuteW = 0; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
-int SpeedLedW = 3; //in minutes
+int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0; //status 0 = unknown, 1 = min, 2 = step; 3 = max
@@ -55,7 +55,17 @@ int OldNumLedWOffset;
 #define LedW5 26
 #define LedW6 27
 
+//Led RGB PINOUT
+#define RLedPwmPin 44
+#define GLedPwmPin 45
+#define BLedPwmPin 46
 
+int RLedValue = 255;
+int GLedValue = 255;
+int BLedValue = 255;
+int RLedValueOld;
+int GLedValueOld;
+int BLedValueOld;
 
 //temp
 #define TempPin 52
@@ -92,9 +102,11 @@ void setup () {
 
   initOutput();
 
-  #ifdef DEBUG_W_LED
-  DebugWLED();
+  #ifdef DEBUG_LED
+  DebugLED();
   #endif
+
+  SerialInfoSetup();
 
 }
 
@@ -103,6 +115,7 @@ void loop () {
   GetTime();
   LedWOn();
   LedWOff();
+  LedRGB();
 
   SerialInfo();
 }
@@ -123,7 +136,7 @@ void SetRTC(){
 }
 
 void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
-
+  //white led
   pinMode(LedW1, OUTPUT);
   digitalWrite(LedW1, LOW);
   pinMode(LedW2, OUTPUT);
@@ -137,10 +150,18 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   pinMode(LedW6, OUTPUT);
   digitalWrite(LedW6, LOW);
 
+  //GRB led;
+  pinMode(RLedPwmPin, OUTPUT);
+  analogWrite(RLedPwmPin, 0);
+  pinMode(GLedPwmPin, OUTPUT);
+  analogWrite(GLedPwmPin, 0);
+  pinMode(GLedPwmPin, OUTPUT);
+  analogWrite(GLedPwmPin, 0);
+
 }
 
-void DebugWLED(){
-  #ifdef DEBUG_W_LED
+void DebugLED(){
+  #ifdef DEBUG_LED
   Serial.println();
   Serial.println("---------- Start test white led ----------");
   digitalWrite(LedW1, HIGH);
@@ -175,6 +196,15 @@ void DebugWLED(){
   digitalWrite(LedW4, LOW);
   digitalWrite(LedW5, LOW);
   digitalWrite(LedW6, LOW);
+  delay(300);
+  RGB_color(255, 0, 0);
+  delay(500);
+  RGB_color(0, 255, 0);
+  delay(500);
+  RGB_color(0, 0, 255);
+  delay(500);
+  RGB_color(0, 0, 0);
+
   Serial.println();
   Serial.println("---------- End test white led ----------");
   #endif
@@ -190,6 +220,7 @@ void GetTime(){
   TimeS = DateTime.second();
   TimeHM = (TimeH * 100) + TimeM;
   //TimeHM = (TimeM * 100) + TimeS;
+
 /*
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
@@ -399,13 +430,68 @@ void LedWSwitch() {
   }
 }
 
+void LedRGB(){
+  if(NumLedWOn == NumLedW){
+    if((RLedValue != RLedValueOld) || (GLedValue != GLedValueOld) || (BLedValue != BLedValueOld)){
+      RGB_color(RLedValue, GLedValue, BLedValue);
+      RLedValueOld = RLedValue;
+      GLedValueOld = GLedValue;
+      BLedValueOld = BLedValue;
+      }
+    }
+  else if (NumLedWOn < NumLedW){
+    RGB_color(0, 0, 0);
+    }
+  else{
+
+  }
+}
+
+
+void RGB_color(int red, int green, int blue){
+  analogWrite(RLedPwmPin, red);
+  analogWrite(GLedPwmPin, green);
+  analogWrite(BLedPwmPin, blue);
+
+  #ifdef DEBUG
+  Serial.println("RGB color set to (RGB 0-255): " + String(red) + ", " + String(green) + ", " + String(blue));
+  #endif
+
+}
+
+
+
+void SerialInfoSetup(){
+  #ifdef DEBUG
+    Serial.println();
+    Serial.println("---------------------SETUP INFO------------------------");
+    Serial.println("Version: " + String(SetRtcY) + String(SetRtcMo) + String(SetRtcD));
+    Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
+    Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
+    Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
+    Serial.println("---------------------END SETUP INFO------------------------");
+
+
+
+  #endif
+}
+
+
 void SerialInfo(){
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
       Serial.println();
-      Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
+      Serial.println("-------------------Start serial info--------------------------");
+      Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
+      Serial.println("Numbers LED stip white on: " + String(NumLedWOn));
+
+
+
+
 
       DEBUG_TimeS = TimeS;
+      Serial.println();
+      Serial.println("-------------------End serial info--------------------------");
     }
 
 
