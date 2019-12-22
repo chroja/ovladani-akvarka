@@ -35,11 +35,11 @@ int TimeS = 0;
 int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
-int StartLedMinuteW = 24;
+int StartLedHourW = 14; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 23;
-int EndLedMinuteW = 0; //zhasne poslední LED, postupnw zhasnou vsechny
+int EndLedHourW = 21;
+int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
@@ -116,7 +116,7 @@ void loop () {
   LedWOn();
   LedWOff();
   LedRGB();
-
+  
   SerialInfo();
 }
 
@@ -219,32 +219,7 @@ void GetTime(){
   TimeM = DateTime.minute();
   TimeS = DateTime.second();
   TimeHM = (TimeH * 100) + TimeM;
-  //TimeHM = (TimeM * 100) + TimeS;
 
-/*
-  #ifdef DEBUG
-    if(TimeS != DEBUG_TimeS){
-      Serial.println();
-      Serial.print("Aktualni cas ");
-      Serial.print(DateTime.hour());
-      Serial.print(':');
-      Serial.print(DateTime.minute());
-      Serial.print(':');
-      Serial.print(DateTime.second());
-      Serial.print(", ");
-      Serial.print(DayOfTheWeek[DateTime.dayOfTheWeek()]);
-      Serial.print(" ");
-      Serial.print(DateTime.day());
-      Serial.print('.');
-      Serial.print(DateTime.month());
-      Serial.print('.');
-      Serial.print(DateTime.year());
-      Serial.print(" hodiny a minty (TimeHM): ");
-      Serial.print(TimeHM);
-      Serial.println();
-      DEBUG_TimeS = TimeS;
-    }
-  #endif*/
 }
 
 void LedWOn(){
@@ -310,7 +285,7 @@ void LedWOff(){
     }
     #endif
   }
-  if((LedWoffsetTime <= TimeHM) /*&& (StartLedW >= TimeHM)*/ && (StatusLedStrip != 1)){
+  if((LedWoffsetTime <= TimeHM) && (StatusLedStrip != 1)){
     if(NumLedWOn > 0){
       NumLedWOn = NumLedWOn - 1;
 
@@ -432,12 +407,7 @@ void LedWSwitch() {
 
 void LedRGB(){
   if(NumLedWOn == NumLedW){
-    if((RLedValue != RLedValueOld) || (GLedValue != GLedValueOld) || (BLedValue != BLedValueOld)){
-      RGB_color(RLedValue, GLedValue, BLedValue);
-      RLedValueOld = RLedValue;
-      GLedValueOld = GLedValue;
-      BLedValueOld = BLedValue;
-      }
+    RGB_color(RLedValue, GLedValue, BLedValue);
     }
   else if (NumLedWOn < NumLedW){
     RGB_color(0, 0, 0);
@@ -449,14 +419,20 @@ void LedRGB(){
 
 
 void RGB_color(int red, int green, int blue){
-  analogWrite(RLedPwmPin, red);
-  analogWrite(GLedPwmPin, green);
-  analogWrite(BLedPwmPin, blue);
 
-  #ifdef DEBUG
-  Serial.println("RGB color set to (RGB 0-255): " + String(red) + ", " + String(green) + ", " + String(blue));
-  #endif
+  if((red != RLedValueOld) || (green != GLedValueOld) || (blue != BLedValueOld)){
+    analogWrite(RLedPwmPin, red);
+    analogWrite(GLedPwmPin, green);
+    analogWrite(BLedPwmPin, blue);
 
+
+    #ifdef DEBUG
+    Serial.println("RGB color set to (RGB 0-255): " + String(red) + ", " + String(green) + ", " + String(blue));
+    RLedValueOld = red;
+    GLedValueOld = green;
+    BLedValueOld = blue;
+    #endif
+  }
 }
 
 
@@ -481,7 +457,8 @@ void SerialInfo(){
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
       Serial.println();
-      Serial.println("-------------------Start serial info--------------------------");
+      Serial.println("------------------------------------------------------------");
+      Serial.println("-------------------Start serial info------------------------");
       Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
       Serial.println("Numbers LED stip white on: " + String(NumLedWOn));
 
@@ -492,6 +469,7 @@ void SerialInfo(){
       DEBUG_TimeS = TimeS;
       Serial.println();
       Serial.println("-------------------End serial info--------------------------");
+      Serial.println("------------------------------------------------------------");
     }
 
 
