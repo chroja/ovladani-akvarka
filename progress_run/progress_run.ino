@@ -105,7 +105,7 @@ void setup () {
   #ifdef DEBUG_LED
   DebugLED();
   #endif
-
+  GetTime();
   SerialInfoSetup();
 
 }
@@ -116,7 +116,7 @@ void loop () {
   LedWOn();
   LedWOff();
   LedRGB();
-  
+
   SerialInfo();
 }
 
