@@ -11,7 +11,7 @@ Set
 
 */
 // defines
-//#define DEBUG
+#define DEBUG
 //#define SET_RTC
 //#define DEBUG_LED
 #define SAFE_TEMP
@@ -500,6 +500,15 @@ void SerialInfoSetup(){
     Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
     Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
     Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
+    Serial.print("Address T0 (water) sensor: ");
+    PrintSensorAdress(T0SensorAddress);
+    Serial.println();
+    Serial.print("Address T1 (cable) sensor: ");
+    PrintSensorAdress(T1SensorAddress);
+    Serial.println();
+
+
+
     Serial.println("---------------------END SETUP INFO------------------------");
 
 
@@ -571,4 +580,19 @@ void printTemperature(DeviceAddress deviceAddress)
   Serial.print(DallasTemperature::toFahrenheit(tempC));
   Serial.print((char)176);
   Serial.println("F");
+}
+
+void PrintSensorAdress (byte  SensorName[8]){
+  byte i;
+  //byte SensorName[8];
+  for( i = 0; i < 8; i++) {
+    Serial.print("0x");
+    if (SensorName[i] < 16) {
+      Serial.print('0');
+    }
+    Serial.print(SensorName[i], HEX);
+    if (i < 7) {
+      Serial.print(", ");
+    }
+  }
 }
