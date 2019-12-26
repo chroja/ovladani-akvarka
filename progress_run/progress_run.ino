@@ -18,6 +18,12 @@ Set
 //#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 
+uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
+#ifdef DRY_RUN
+  uint8_t T1SensorAddress[8] = { 0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0 }; //cable sensor - test!
+#else
+  uint8_t T1SensorAddress[8] = { 0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 }; //cable sensor
+#endif
 
 
 //librlies
@@ -93,14 +99,14 @@ int ErrorTemp = 10;
 int TempReadTime = 10;
 float T0Offset = 0;
 float T1Offset = 0;
-
+/*
 DeviceAddress T0SensorAddress = {0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61}; //water sensor
 #ifdef DRY_RUN
   DeviceAddress T1SensorAddress = {0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0}; //cable sensor - test!
 #else
   DeviceAddress T1SensorAddress = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //cable sensor
 #endif
-
+*/
 
 
 
@@ -157,6 +163,14 @@ void loop () {
   LedWOn();
   LedWOff();
   LedRGB();
+
+  SensorsDS.requestTemperatures();
+
+Serial.print("Sensor 1: ");
+printTemperature(T0SensorAddress);
+
+Serial.print("Sensor 2: ");
+printTemperature(T1SensorAddress);
 
 
   SerialInfo();
@@ -356,8 +370,6 @@ void LedWOff(){
   }
 }
 
-
-
 void LedWSwitch() {
   switch(NumLedWOn){
     case 0:
@@ -463,7 +475,6 @@ void LedRGB(){
   }
 }
 
-
 void RGB_color(int red, int green, int blue){
 
   if((red != RLedValueOld) || (green != GLedValueOld) || (blue != BLedValueOld)){
@@ -481,8 +492,6 @@ void RGB_color(int red, int green, int blue){
   }
 }
 
-
-
 void SerialInfoSetup(){
   #ifdef DEBUG
     Serial.println();
@@ -491,7 +500,6 @@ void SerialInfoSetup(){
     Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
     Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
     Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
-
     Serial.println("---------------------END SETUP INFO------------------------");
 
 
@@ -552,4 +560,15 @@ void DiscoverOneWireDevices(void) {
     oneWireDS.reset_search();
     return;
   #endif
+}
+
+void printTemperature(DeviceAddress deviceAddress)
+{
+  float tempC = SensorsDS.getTempC(deviceAddress);
+  Serial.print(tempC);
+  Serial.print((char)176);
+  Serial.print("C  |  ");
+  Serial.print(DallasTemperature::toFahrenheit(tempC));
+  Serial.print((char)176);
+  Serial.println("F");
 }
