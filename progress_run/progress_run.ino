@@ -9,17 +9,19 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 #define DEBUG
 //#define SET_RTC
 //#define DEBUG_LED
-#define SAFETY_TEMP
+#define SAFE_TEMP
 
 //librlies
 #include <Wire.h>
 #include "RTClib.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 //declarate variables
 //for RTC
 int SetRtcY = 2019;
 int SetRtcMo = 12;
-int SetRtcD = 21;
+int SetRtcD = 25;
 int SetRtcH = 18;
 int SetRtcM = 33;
 int SetRtcS = 30;
@@ -35,13 +37,13 @@ int TimeS = 0;
 int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 14; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 7; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
-int SpeedLedW = 5; //in minutes
+int SpeedLedW = 1; //in minutes
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0; //status 0 = unknown, 1 = min, 2 = step; 3 = max
@@ -68,13 +70,24 @@ int GLedValueOld;
 int BLedValueOld;
 
 //temp
-#define TempPin 52
+#define TempPin 40
+#define Heat0  38//heating cable
+#define Heat1  39//heater in water
+float T0 = 0;
+float T1 = 0;
+float TargetTemp = 23;
+float DeltaT = 0.5;
+bool T0Sensor = 1; //heat cable - sensor index
+bool T1Sensor = !T0Sensor; //water - sensor index
+int SafeTempHeat0 = 35;
+int TimeOutHeat0 = 60; //
+
+
+
 
 
 //time variable
 int DEBUG_TimeS = 0;
-
-//DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
 
 // add RTC instance
 RTC_DS1307 DS1307;
@@ -85,7 +98,7 @@ char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "p
 void setup () {
   #ifdef DEBUG
   // serial comunication via USB
-  Serial.begin(9600);
+  Serial.begin(115200);
   #endif
   // chceck if RTC connected
   if (! DS1307.begin()) {
@@ -149,6 +162,10 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   digitalWrite(LedW5, LOW);
   pinMode(LedW6, OUTPUT);
   digitalWrite(LedW6, LOW);
+  pinMode(Heat0, OUTPUT);
+  digitalWrite(Heat0, LOW);
+  pinMode(Heat1, OUTPUT);
+  digitalWrite(Heat1, LOW);
 
   //GRB led;
   pinMode(RLedPwmPin, OUTPUT);
