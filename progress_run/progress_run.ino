@@ -3,6 +3,11 @@
 Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 
 
+sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
+              0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0 vnejsi kratky kabel
+              0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 v akva
+Set
+
 
 */
 // defines
@@ -10,6 +15,10 @@ Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
 //#define SET_RTC
 //#define DEBUG_LED
 #define SAFE_TEMP
+//#define SEARCH_ADDRESS_DS18B20
+#define DRY_RUN
+
+
 
 //librlies
 #include <Wire.h>
@@ -40,10 +49,10 @@ int TimeHM = 0;
 int StartLedHourW = 7; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 21;
+int EndLedHourW = 22;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
-int SpeedLedW = 1; //in minutes
+int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0; //status 0 = unknown, 1 = min, 2 = step; 3 = max
@@ -71,16 +80,26 @@ int BLedValueOld;
 
 //temp
 #define TempPin 40
-#define Heat0  38//heating cable
-#define Heat1  39//heater in water
-float T0 = 0;
-float T1 = 0;
+#define Heat0  38//heat water
+#define Heat1  39//heat cable
+
+float T0tepm = 0; //temp on T0 with calibration offset
+float T1Temp = 0; //temp on T1 with calibration offset
 float TargetTemp = 23;
 float DeltaT = 0.5;
-bool T0Sensor = 1; //heat cable - sensor index
-bool T1Sensor = !T0Sensor; //water - sensor index
 int SafeTempHeat0 = 35;
-int TimeOutHeat0 = 60; //
+int TimeOutHeat0 = 60; // in minutes
+int ErrorTemp = 10;
+int TempReadTime = 10;
+float T0Offset = 0;
+float T1Offset = 0;
+
+DeviceAddress T0SensorAddress = {0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61}; //water sensor
+#ifdef DRY_RUN
+  DeviceAddress T1SensorAddress = {0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0}; //cable sensor - test!
+#else
+  DeviceAddress T1SensorAddress = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //cable sensor
+#endif
 
 
 
@@ -92,6 +111,10 @@ int DEBUG_TimeS = 0;
 // add RTC instance
 RTC_DS1307 DS1307;
 
+//add ds instance
+OneWire oneWireDS (TempPin);
+DallasTemperature SensorsDS(&oneWireDS);
+
 // days
 char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "patek", "sobota"};
 
@@ -100,6 +123,7 @@ void setup () {
   // serial comunication via USB
   Serial.begin(115200);
   #endif
+
   // chceck if RTC connected
   if (! DS1307.begin()) {
     Serial.println("Hodiny nejsou pripojeny!");
@@ -119,16 +143,21 @@ void setup () {
   DebugLED();
   #endif
   GetTime();
+  DiscoverOneWireDevices();
+  SensorsDS.begin();
   SerialInfoSetup();
+
 
 }
 
 void loop () {
 
   GetTime();
+  //GetTemp();
   LedWOn();
   LedWOff();
   LedRGB();
+
 
   SerialInfo();
 }
@@ -462,6 +491,7 @@ void SerialInfoSetup(){
     Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
     Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
     Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
+
     Serial.println("---------------------END SETUP INFO------------------------");
 
 
@@ -490,5 +520,36 @@ void SerialInfo(){
     }
 
 
+  #endif
+}
+
+void DiscoverOneWireDevices(void) {
+  #ifdef SEARCH_ADDRESS_DS18B20
+    byte i;
+    byte present = 0;
+    byte data[12];
+    byte addr[8];
+
+    Serial.print("Looking for 1-Wire devices...\n\r");
+    while(oneWireDS.search(addr)) {
+      Serial.print("\n\rFound \'1-Wire\' device with address:\n\r");
+      for( i = 0; i < 8; i++) {
+        Serial.print("0x");
+        if (addr[i] < 16) {
+          Serial.print('0');
+        }
+        Serial.print(addr[i], HEX);
+        if (i < 7) {
+          Serial.print(", ");
+        }
+      }
+      if ( OneWire::crc8( addr, 7) != addr[7]) {
+          Serial.print("CRC is not valid!\n");
+          return;
+      }
+    }
+    Serial.print("\n\r\n\rThat's it.\r\n");
+    oneWireDS.reset_search();
+    return;
   #endif
 }
