@@ -11,11 +11,11 @@ Set
 
 */
 // defines
-#define DEBUG
+//#define DEBUG
 //#define SET_RTC
 //#define DEBUG_LED
 #define SAFE_TEMP
-//#define SEARCH_ADDRESS_DS18B20
+#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 
 uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
@@ -125,10 +125,10 @@ DallasTemperature SensorsDS(&oneWireDS);
 char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "patek", "sobota"};
 
 void setup () {
-  #ifdef DEBUG
+//  #ifdef DEBUG
   // serial comunication via USB
   Serial.begin(115200);
-  #endif
+//  #endif
 
   // chceck if RTC connected
   if (! DS1307.begin()) {
