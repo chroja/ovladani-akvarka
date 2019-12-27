@@ -17,6 +17,7 @@ Set
 #define SAFE_TEMP
 #define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
+#define RESTART
 
 uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
 #ifdef DRY_RUN
@@ -52,7 +53,7 @@ int TimeS = 0;
 int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 7; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 22;
@@ -99,16 +100,9 @@ int ErrorTemp = 10;
 int TempReadTime = 10;
 float T0Offset = 0;
 float T1Offset = 0;
-/*
-DeviceAddress T0SensorAddress = {0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61}; //water sensor
-#ifdef DRY_RUN
-  DeviceAddress T1SensorAddress = {0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0}; //cable sensor - test!
-#else
-  DeviceAddress T1SensorAddress = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //cable sensor
-#endif
-*/
 
 
+#define RestartPin 53
 
 
 //time variable
@@ -153,7 +147,7 @@ void setup () {
   SensorsDS.begin();
   SerialInfoSetup();
 
-
+delay (500);
 }
 
 void loop () {
@@ -171,7 +165,9 @@ printTemperature(T0SensorAddress);
 
 Serial.print("Sensor 2: ");
 printTemperature(T1SensorAddress);
-
+if(millis()>=6000){
+  Restart("I dont know", millis());
+}
 
   SerialInfo();
 }
@@ -193,6 +189,8 @@ void SetRTC(){
 
 void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   //white led
+  digitalWrite(RestartPin, HIGH);
+  pinMode(RestartPin, OUTPUT);
   pinMode(LedW1, OUTPUT);
   digitalWrite(LedW1, LOW);
   pinMode(LedW2, OUTPUT);
@@ -567,6 +565,7 @@ void DiscoverOneWireDevices(void) {
     }
     Serial.print("\n\r\n\rThat's it.\r\n");
     oneWireDS.reset_search();
+    delay (500);
     return;
   #endif
 }
@@ -595,4 +594,21 @@ void PrintSensorAdress (byte  SensorName[8]){
       Serial.print(", ");
     }
   }
+}
+
+void Restart(String Message, int Value){
+  #ifdef RESTART
+  Serial.println();
+  Serial.print("Why restart device: ");
+  Serial.print(Message);
+  Serial.print(" Value: ");
+  Serial.println(Value);
+  Serial.println("--------------------------------------------------------------------------------------");
+  Serial.println("----------------------------------------RESTART DEVICE--------------------------------");
+  Serial.println("--------------------------------------------------------------------------------------");
+  Serial.println();
+  Serial.println();
+  delay(500);
+  digitalWrite(RestartPin, LOW);
+  #endif
 }
