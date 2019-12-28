@@ -8,6 +8,8 @@ sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
               0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 v akva
 Set
 
+pum 515ms/ml
+
 
 */
 // defines
@@ -15,9 +17,11 @@ Set
 //#define SET_RTC
 //#define DEBUG_LED
 #define SAFE_TEMP
+#define TEMP_OFFSET
 //#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 #define RESTART
+//#define SERIAL_INFO
 
 uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
 #ifdef DRY_RUN
@@ -25,6 +29,28 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 #else
   uint8_t T1SensorAddress[8] = { 0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 }; //cable sensor
 #endif
+
+
+//variales led pin (W D22-D27)
+#define LedW1 22
+#define LedW2 23
+#define LedW3 24
+#define LedW4 25
+#define LedW5 26
+#define LedW6 27
+
+//Led RGB PINOUT
+#define RLedPwmPin 44
+#define GLedPwmPin 45
+#define BLedPwmPin 46
+
+//temp
+#define Heat0  38//heat water
+#define Heat1  39//heat cable
+#define TempPin 40
+#define RestartSensorPin 41
+#define RestartPin 53
+
 
 
 //librlies
@@ -56,7 +82,7 @@ int TimeHM = 0;
 int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 23;
+int EndLedHourW = 14;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 5; //in minutes
@@ -65,19 +91,7 @@ int NumLedWOn = 0;
 byte StatusLedStrip = 0; //status 0 = unknown, 1 = min, 2 = step; 3 = max
 int OldNumLedWOffset;
 
-//variales led pin (W D22-D27)
-#define LedW1 22
-#define LedW2 23
-#define LedW3 24
-#define LedW4 25
-#define LedW5 26
-#define LedW6 27
-
-//Led RGB PINOUT
-#define RLedPwmPin 44
-#define GLedPwmPin 45
-#define BLedPwmPin 46
-
+//RGB val
 int RLedValue = 255;
 int GLedValue = 255;
 int BLedValue = 255;
@@ -86,28 +100,34 @@ int GLedValueOld;
 int BLedValueOld;
 
 //temp
-#define Heat0  38//heat water
-#define Heat1  39//heat cable
-#define TempPin 40
-#define RestartSensorPin 41
-
-
-float T0tepm = 0; //temp on T0 with calibration offset
+//DS tem sensors
+float T0Temp = 0; //temp on T0 with calibration offset
 float T1Temp = 0; //temp on T1 with calibration offset
+#ifdef TEMP_OFFSET
+  float T0Offset = -0.2;
+  float T1Offset = -1.2;
+#else
+  float T0Offset = 0;
+  float T1Offset = 0;
+#endif
+int DSCountSensor = 0;
+int DSUseSensor = 2;
+int DSSetupConnectAttemp = 0;
+int NextReadTepmMin = 0;
+int LastReadTemp;
+//heat
 float TargetTemp = 23;
 float DeltaT = 0.5;
 int SafeTempHeat0 = 35;
 int TimeOutHeat0 = 60; // in minutes
-int ErrorTemp = 10;
-int TempReadTime = 10;
-float T0Offset = 0;
-float T1Offset = 0;
-int DSCountSensor = 0;
-int DSUseSensor = 2;
-int DSSetupConnectAttemp = 0;
+int ErrorTempMax = 10;
+int ErrorTempCurrent = 0;
+int TempReadTime = 1;
 
 
-#define RestartPin 53
+
+
+
 
 
 //time variable
@@ -155,9 +175,10 @@ void setup () {
 
   SerialInfoSetup();
 
-
-
-
+  NextReadTepmMin = TimeM;
+  if(TimeS > 45){
+    NextReadTepmMin ++;
+  }
   delay (500);
   Serial.println("------End setup-----");
 }
@@ -165,20 +186,16 @@ void setup () {
 void loop () {
 
   GetTime();
-  //GetTemp();
+  GetTemp();
   LedWOn();
   LedWOff();
   LedRGB();
 
-  SensorsDS.requestTemperatures();
+  #ifdef SERIAL_INFO
+    SerialInfo();
+  #endif
 
-Serial.print("Sensor 1: ");
-printTemperature(T0SensorAddress);
 
-Serial.print("Sensor 2: ");
-printTemperature(T1SensorAddress);
-
-  SerialInfo();
 }
 
 void SetRTC(){
@@ -312,6 +329,47 @@ void GetTime(){
   TimeS = DateTime.second();
   TimeHM = (TimeH * 100) + TimeM;
 
+}
+
+void GetTemp(){
+  if (NextReadTepmMin == TimeM){
+    #ifdef DEBUG
+     Serial.println("Start mesaure temp T0 + T1");
+    #endif
+    SensorsDS.requestTemperatures();
+    T0Temp = SensorsDS.getTempC(T0SensorAddress[8]);
+    T1Temp = SensorsDS.getTempC(T1SensorAddress[8]);
+    NextReadTepmMin = (NextReadTepmMin + TempReadTime) % 60;
+    LastReadTemp = TimeHM;
+    #ifdef DEBUG
+      Serial.println("Temp read.");
+      Serial.println("T0 read temp is: " + String(T0Temp) + "C");
+      Serial.println("T1 read temp is: " + String(T1Temp) + "C");
+      Serial.println("Current mesaure in time: " + String(LastReadTemp) + " Next Read in minute: " + String(NextReadTepmMin));
+    #endif
+    if (((T0Temp > (-127)) && (T0Temp < (85))) && ((T1Temp > (-127)) && (T1Temp < (85)))){
+      ErrorTempCurrent = 0;
+      T0Temp = T0Temp + T0Offset;
+      T1Temp = T1Temp + T1Offset;
+
+      #ifdef DEBUG
+        Serial.println("Temp mesaure is ok.");
+        Serial.println("T0 with offset temp is: " + String(T0Temp) + "C");
+        Serial.println("T1 with offset temp is: " + String(T1Temp) + "C");
+      #endif
+    }
+    else if (ErrorTempCurrent < ErrorTempMax){
+      #ifdef DEBUG
+        Serial.println("Temp mesaure is FAIL.");
+        Serial.println("Error Temp counter is: " + String(ErrorTempCurrent+1) + " / " + String(ErrorTempMax));
+      #endif
+      ErrorTempCurrent ++;
+    }
+    else{
+      Restart("Lot of error mesaure. Total: ", ErrorTempCurrent);
+    }
+    Serial.println(); Serial.println();
+  }
 }
 
 void LedWOn(){
