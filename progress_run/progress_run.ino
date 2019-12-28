@@ -15,7 +15,7 @@ Set
 //#define SET_RTC
 //#define DEBUG_LED
 #define SAFE_TEMP
-#define SEARCH_ADDRESS_DS18B20
+//#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 #define RESTART
 
@@ -56,7 +56,7 @@ int TimeHM = 0;
 int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 22;
+int EndLedHourW = 23;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 5; //in minutes
@@ -86,9 +86,11 @@ int GLedValueOld;
 int BLedValueOld;
 
 //temp
-#define TempPin 40
 #define Heat0  38//heat water
 #define Heat1  39//heat cable
+#define TempPin 40
+#define RestartSensorPin 41
+
 
 float T0tepm = 0; //temp on T0 with calibration offset
 float T1Temp = 0; //temp on T1 with calibration offset
@@ -100,6 +102,9 @@ int ErrorTemp = 10;
 int TempReadTime = 10;
 float T0Offset = 0;
 float T1Offset = 0;
+int DSCountSensor = 0;
+int DSUseSensor = 2;
+int DSSetupConnectAttemp = 0;
 
 
 #define RestartPin 53
@@ -122,6 +127,7 @@ void setup () {
 //  #ifdef DEBUG
   // serial comunication via USB
   Serial.begin(115200);
+  Serial.println("------Start setup-----");
 //  #endif
 
   // chceck if RTC connected
@@ -145,9 +151,15 @@ void setup () {
   GetTime();
   DiscoverOneWireDevices();
   SensorsDS.begin();
+  SensorsDSRun();
+
   SerialInfoSetup();
 
-delay (500);
+
+
+
+  delay (500);
+  Serial.println("------End setup-----");
 }
 
 void loop () {
@@ -165,9 +177,6 @@ printTemperature(T0SensorAddress);
 
 Serial.print("Sensor 2: ");
 printTemperature(T1SensorAddress);
-if(millis()>=6000){
-  Restart("I dont know", millis());
-}
 
   SerialInfo();
 }
@@ -216,6 +225,31 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   pinMode(GLedPwmPin, OUTPUT);
   analogWrite(GLedPwmPin, 0);
 
+  //
+  pinMode(RestartSensorPin, OUTPUT);
+  digitalWrite(RestartSensorPin, LOW);
+
+}
+
+void SensorsDSRun(){
+  DSCountSensor = SensorsDS.getDeviceCount();
+  delay(1000);
+  while(DSCountSensor != DSUseSensor){
+    if(DSSetupConnectAttemp < 2){
+
+      digitalWrite(RestartSensorPin, HIGH);
+      delay(100);
+      digitalWrite(RestartSensorPin, LOW);
+      delay(100);
+      DSCountSensor = SensorsDS.getDeviceCount();
+      //delay(1000);
+      Serial.println("Detected " + String(DSCountSensor) + " sensor(s). Attemp connected: " + String(DSSetupConnectAttemp + 1));
+      DSSetupConnectAttemp ++;
+    }
+    else{
+      Restart("Detected different number connected sensors!", DSCountSensor);
+    }
+  }
 }
 
 void DebugLED(){
@@ -504,6 +538,7 @@ void SerialInfoSetup(){
     Serial.print("Address T1 (cable) sensor: ");
     PrintSensorAdress(T1SensorAddress);
     Serial.println();
+    Serial.println("DS18B20 conected sensors: " + String(DSCountSensor));
 
 
 
