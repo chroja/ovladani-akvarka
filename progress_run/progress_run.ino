@@ -21,7 +21,7 @@ pum 515ms/ml
 //#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 #define RESTART
-//#define SERIAL_INFO
+#define SERIAL_INFO
 
 uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
 #ifdef DRY_RUN
@@ -103,9 +103,11 @@ int BLedValueOld;
 //DS tem sensors
 float T0Temp = 0; //temp on T0 with calibration offset
 float T1Temp = 0; //temp on T1 with calibration offset
+float T0TempNoOffset = 0;
+float T1TempNoOffset = 0;
 #ifdef TEMP_OFFSET
-  float T0Offset = -0.2;
-  float T1Offset = -1.2;
+  float T0Offset = -0.8;
+  float T1Offset = -0.54;
 #else
   float T0Offset = 0;
   float T1Offset = 0;
@@ -122,7 +124,7 @@ int SafeTempHeat0 = 35;
 int TimeOutHeat0 = 60; // in minutes
 int ErrorTempMax = 10;
 int ErrorTempCurrent = 0;
-int TempReadTime = 1;
+int TempReadTime = 5;
 
 
 
@@ -334,39 +336,39 @@ void GetTime(){
 void GetTemp(){
   if (NextReadTepmMin == TimeM){
     #ifdef DEBUG
-     Serial.println("Start mesaure temp T0 + T1");
+     Serial.println("Start measure temp T0 + T1");
     #endif
     SensorsDS.requestTemperatures();
-    T0Temp = SensorsDS.getTempC(T0SensorAddress[8]);
-    T1Temp = SensorsDS.getTempC(T1SensorAddress[8]);
+    T0TempNoOffset = ReadTemperature(T0SensorAddress);
+    T1TempNoOffset = ReadTemperature(T1SensorAddress);
     NextReadTepmMin = (NextReadTepmMin + TempReadTime) % 60;
     LastReadTemp = TimeHM;
     #ifdef DEBUG
       Serial.println("Temp read.");
-      Serial.println("T0 read temp is: " + String(T0Temp) + "C");
-      Serial.println("T1 read temp is: " + String(T1Temp) + "C");
-      Serial.println("Current mesaure in time: " + String(LastReadTemp) + " Next Read in minute: " + String(NextReadTepmMin));
+      Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "C");
+      Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "C");
+      Serial.println("Current measure in time: " + String(LastReadTemp) + " Next Read in minute: " + String(NextReadTepmMin));
     #endif
-    if (((T0Temp > (-127)) && (T0Temp < (85))) && ((T1Temp > (-127)) && (T1Temp < (85)))){
+    if (((T0TempNoOffset > (-127)) && (T0TempNoOffset < (85))) && ((T1TempNoOffset > (-127)) && (T1TempNoOffset < (85)))){
       ErrorTempCurrent = 0;
-      T0Temp = T0Temp + T0Offset;
-      T1Temp = T1Temp + T1Offset;
+      T0Temp = T0TempNoOffset + T0Offset;
+      T1Temp = T1TempNoOffset + T1Offset;
 
       #ifdef DEBUG
-        Serial.println("Temp mesaure is ok.");
+        Serial.println("Temp measure is ok.");
         Serial.println("T0 with offset temp is: " + String(T0Temp) + "C");
         Serial.println("T1 with offset temp is: " + String(T1Temp) + "C");
       #endif
     }
     else if (ErrorTempCurrent < ErrorTempMax){
       #ifdef DEBUG
-        Serial.println("Temp mesaure is FAIL.");
+        Serial.println("Temp measure is FAIL.");
         Serial.println("Error Temp counter is: " + String(ErrorTempCurrent+1) + " / " + String(ErrorTempMax));
       #endif
       ErrorTempCurrent ++;
     }
     else{
-      Restart("Lot of error mesaure. Total: ", ErrorTempCurrent);
+      Restart("Lot of error measure. Total: ", ErrorTempCurrent);
     }
     Serial.println(); Serial.println();
   }
@@ -607,7 +609,6 @@ void SerialInfoSetup(){
   #endif
 }
 
-
 void SerialInfo(){
   #ifdef DEBUG
     if(TimeS != DEBUG_TimeS){
@@ -616,7 +617,11 @@ void SerialInfo(){
       Serial.println("-------------------Start serial info------------------------");
       Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
       Serial.println("Numbers LED stip white on: " + String(NumLedWOn));
-
+      Serial.println("Water temp is: " + String(T0Temp) + "°C. Cable temp is: " + String(T1Temp) + "°C.");
+      //Serial.print("The last temperature measured was at: " + String(LastReadTemp,3) + ". Measure every " + String(TempReadTime) + " minutes.");
+      Serial.print("The last temperature measured was at: ");
+      if (LastReadTemp<100){Serial.print("00");} else if (LastReadTemp<1000){Serial.print("0");}
+      Serial.println(String(LastReadTemp) + ". Measure every " + String(TempReadTime) + " minutes.");
 
 
 
@@ -663,15 +668,9 @@ void DiscoverOneWireDevices(void) {
   #endif
 }
 
-void printTemperature(DeviceAddress deviceAddress)
-{
+float ReadTemperature(DeviceAddress deviceAddress){
   float tempC = SensorsDS.getTempC(deviceAddress);
-  Serial.print(tempC);
-  Serial.print((char)176);
-  Serial.print("C  |  ");
-  Serial.print(DallasTemperature::toFahrenheit(tempC));
-  Serial.print((char)176);
-  Serial.println("F");
+  return tempC;
 }
 
 void PrintSensorAdress (byte  SensorName[8]){

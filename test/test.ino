@@ -1,23 +1,32 @@
-int Reset = 53;
+// Teplotní čidlo DS18B20
 
-void setup() {
-  digitalWrite(Reset, HIGH);
-  delay(200);
-  pinMode(Reset, OUTPUT);
+// připojení knihoven
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// nastavení čísla vstupního pinu
+const int pinCidlaDS = 40;
+// vytvoření instance oneWireDS z knihovny OneWire
+OneWire oneWireDS(pinCidlaDS);
+// vytvoření instance senzoryDS z knihovny DallasTemperature
+DallasTemperature senzoryDS(&oneWireDS);
+
+void setup(void) {
+  // komunikace přes sériovou linku rychlostí 9600 baud
   Serial.begin(115200);
-  Serial.println("How to Reset Arduino Programmatically");
-  Serial.println("www.TheEngineeringProjects.com");
-  delay(200);
+  // zapnutí komunikace knihovny s teplotním čidlem
+  senzoryDS.begin();
 }
-void loop()
-{
-  Serial.println("A");
+
+void loop(void) {
+  // načtení informací ze všech připojených čidel na daném pinu
+  senzoryDS.requestTemperatures();
+  // výpis teploty na sériovou linku, při připojení více čidel
+  // na jeden pin můžeme postupně načíst všechny teploty
+  // pomocí změny čísla v závorce (0) - pořadí dle unikátní adresy čidel
+  Serial.print("Teplota cidla DS18B20: ");
+  Serial.print(senzoryDS.getTempCByIndex(0));
+  Serial.println(" stupnu Celsia");
+  // pauza pro přehlednější výpis
   delay(1000);
-  Serial.println("B");
-  delay(1000);
-  Serial.println("Now we are Resetting Arduino Programmatically");
-  Serial.println();
-  delay(1000);
-  digitalWrite(Reset, LOW);
-  Serial.println("Arduino will never reach there.");
 }
