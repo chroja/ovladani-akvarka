@@ -8,7 +8,7 @@ sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
               0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 v akva
 Set
 
-pum 515ms/ml
+pumpa 520ms/ml
 
 
 */
@@ -16,7 +16,6 @@ pum 515ms/ml
 #define DEBUG
 //#define SET_RTC
 //#define DEBUG_LED
-#define SAFE_TEMP
 #define TEMP_OFFSET
 //#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
@@ -45,8 +44,8 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 #define BLedPwmPin 46
 
 //temp
-#define Heat0  38//heat water
-#define Heat1  39//heat cable
+#define Heat0  37//heat water rellay
+#define Heat1  39//heat cable rellay
 #define TempPin 40
 #define RestartSensorPin 41
 #define RestartPin 53
@@ -79,10 +78,10 @@ int TimeS = 0;
 int TimeHM = 0;
 
 //var for LEDs
-int StartLedHourW = 13; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 12; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 0;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 14;
+int EndLedHourW = 20;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 5; //in minutes
@@ -117,23 +116,22 @@ int DSUseSensor = 2;
 int DSSetupConnectAttemp = 0;
 int NextReadTepmMin = 0;
 int LastReadTemp;
+int ErrorTempMax = 10;
+int ErrorTempCurrent = 0;
+int TempReadTime = 1;
 //heat
 float TargetTemp = 23;
 float DeltaT = 0.5;
-int SafeTempHeat0 = 35;
-int TimeOutHeat0 = 60; // in minutes
-int ErrorTempMax = 10;
-int ErrorTempCurrent = 0;
-int TempReadTime = 5;
-
-
-
+int Heat1SafeTemp = 28;
+bool Heat0State = 0;
+bool Heat1State = 0;
 
 
 
 
 //time variable
 int DEBUG_TimeS = 0;
+bool FirstRun = 0;
 
 // add RTC instance
 RTC_DS1307 DS1307;
@@ -144,6 +142,9 @@ DallasTemperature SensorsDS(&oneWireDS);
 
 // days
 char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "patek", "sobota"};
+
+
+//****************************************** SETUP ****************************************
 
 void setup () {
 //  #ifdef DEBUG
@@ -185,6 +186,8 @@ void setup () {
   Serial.println("------End setup-----");
 }
 
+//****************************************** LOOP ****************************************
+
 void loop () {
 
   GetTime();
@@ -192,13 +195,16 @@ void loop () {
   LedWOn();
   LedWOff();
   LedRGB();
+  Heat();
 
   #ifdef SERIAL_INFO
     SerialInfo();
   #endif
 
-
+  FirstRun = 1;
 }
+
+//****************************************** FUNCTION ****************************************
 
 void SetRTC(){
   //adjus time in RTC module
@@ -231,10 +237,6 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   digitalWrite(LedW5, LOW);
   pinMode(LedW6, OUTPUT);
   digitalWrite(LedW6, LOW);
-  pinMode(Heat0, OUTPUT);
-  digitalWrite(Heat0, LOW);
-  pinMode(Heat1, OUTPUT);
-  digitalWrite(Heat1, LOW);
 
   //GRB led;
   pinMode(RLedPwmPin, OUTPUT);
@@ -247,6 +249,11 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   //
   pinMode(RestartSensorPin, OUTPUT);
   digitalWrite(RestartSensorPin, LOW);
+  //heating
+  pinMode(Heat0, OUTPUT);
+  digitalWrite(Heat0, !Heat0State);
+  pinMode(Heat1, OUTPUT);
+  digitalWrite(Heat1, !Heat1State);
 
 }
 
@@ -599,8 +606,8 @@ void SerialInfoSetup(){
     PrintSensorAdress(T1SensorAddress);
     Serial.println();
     Serial.println("DS18B20 conected sensors: " + String(DSCountSensor));
-
-
+    Serial.println("Temp set to: " + String(TargetTemp) + "°C with delta temp +- " + String(DeltaT) + "°C (" + String(TargetTemp - DeltaT) + "°C - " + String(TargetTemp + DeltaT) + "°C)");
+    Serial.println("Safety temp for Heat cable is: " + String(Heat1SafeTemp) + "°C");
 
     Serial.println("---------------------END SETUP INFO------------------------");
 
@@ -622,7 +629,8 @@ void SerialInfo(){
       Serial.print("The last temperature measured was at: ");
       if (LastReadTemp<100){Serial.print("00");} else if (LastReadTemp<1000){Serial.print("0");}
       Serial.println(String(LastReadTemp) + ". Measure every " + String(TempReadTime) + " minutes.");
-
+      Serial.println("Heater in water have state: " + String(Heat0State));
+      Serial.println("Heat cable have state: " + String(Heat1State));
 
 
 
@@ -703,4 +711,60 @@ void Restart(String Message, int Value){
   delay(500);
   digitalWrite(RestartPin, LOW);
   #endif
+}
+
+void RellayInvertSwitch(int Pin, bool State, String Description){
+  digitalWrite(Pin, !State);
+  #ifdef DEBUG
+    Serial.println("Switch rellay " + Description + "(" + String(Pin) + ")"+ " to state " + String(State));
+  #endif
+}
+
+void Heat(){
+  if(T0Temp != 0){
+    if((T0Temp <= TargetTemp) && (T1Temp < Heat1SafeTemp) && (Heat1State != 1)){
+      Heat1State = 1;
+      RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
+      #ifdef DEBUG
+        Serial.println("Heat cable is on.");
+      #endif
+    }
+    else if((T0Temp >= (TargetTemp + DeltaT)) && (Heat1State == 1)){
+      Heat1State = 0;
+      RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
+      #ifdef DEBUG
+        Serial.println("Heat cable is off. Standart turn off.");
+      #endif
+    }
+
+    if ((T1Temp >= Heat1SafeTemp) && (Heat1State == 1)){
+      Heat1State = 0;
+      RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
+      #ifdef DEBUG
+        Serial.println("Heat cable is off. Dangerous temperature reached.");
+      #endif
+    }
+  }
+  else{
+    if(FirstRun == 0){
+      #ifdef DEBUG
+        Serial.println("Temp isn´t read.");
+      #endif
+    }
+  }
+
+  if ((T0Temp <= (TargetTemp - DeltaT)) && (Heat0State != 1)){
+    Heat0State = 1;
+    RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
+    #ifdef DEBUG
+      Serial.println("Heater in water is on.");
+    #endif
+  }
+  else if((T0Temp >= TargetTemp) && (Heat0State == 1)){
+    Heat0State = 0;
+    RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
+    #ifdef DEBUG
+      Serial.println("Heater in water is off.");
+    #endif
+  }
 }
