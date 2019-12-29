@@ -125,6 +125,10 @@ float DeltaT = 0.5;
 int Heat1SafeTemp = 28;
 bool Heat0State = 0;
 bool Heat1State = 0;
+unsigned long LastT0HeatStart = 0;
+unsigned long LastT1HeatStart = 0;
+unsigned long LastT0HeatEnd = 0;
+unsigned long LastT1HeatEnd = 0;
 
 
 
@@ -629,9 +633,8 @@ void SerialInfo(){
       Serial.print("The last temperature measured was at: ");
       if (LastReadTemp<100){Serial.print("00");} else if (LastReadTemp<1000){Serial.print("0");}
       Serial.println(String(LastReadTemp) + ". Measure every " + String(TempReadTime) + " minutes.");
-      Serial.println("Heater in water have state: " + String(Heat0State));
-      Serial.println("Heat cable have state: " + String(Heat1State));
-
+      Serial.println("Heater in water have state: " + String(Heat0State) + ". Last start heat water heating (MMDDhhmm): " + String (LastT0HeatStart) + " Last end: " + String (LastT0HeatEnd) + " (MMDDhhmm)");
+      Serial.println("Heat cable have state: " + String(Heat1State) + ". Last start heat cable: " + String (LastT1HeatStart) + " Last end: " + String (LastT1HeatEnd) + " (MMDDhhmm)");
 
 
       DEBUG_TimeS = TimeS;
@@ -724,6 +727,7 @@ void Heat(){
   if(T0Temp != 0){
     if((T0Temp <= TargetTemp) && (T1Temp < Heat1SafeTemp) && (Heat1State != 1)){
       Heat1State = 1;
+      LastT1HeatStart = (TimeMo * 1000000) + (long(TimeDay) * 10000) + (TimeH * 100) + (TimeM); //mmddhhmm
       RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
       #ifdef DEBUG
         Serial.println("Heat cable is on.");
@@ -731,6 +735,7 @@ void Heat(){
     }
     else if((T0Temp >= (TargetTemp + DeltaT)) && (Heat1State == 1)){
       Heat1State = 0;
+      LastT1HeatEnd = (TimeMo * 1000000) + (long(TimeDay) * 10000) + (TimeH * 100) + TimeM; //mmddhhmm
       RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
       #ifdef DEBUG
         Serial.println("Heat cable is off. Standart turn off.");
@@ -739,11 +744,30 @@ void Heat(){
 
     if ((T1Temp >= Heat1SafeTemp) && (Heat1State == 1)){
       Heat1State = 0;
+      LastT1HeatEnd = (TimeMo * 1000000) + (long(TimeDay)* 10000) + (TimeH * 100) + TimeM; //mmddhhmm
       RellayInvertSwitch(Heat1, Heat1State, "Heat1 - cable heater");
       #ifdef DEBUG
         Serial.println("Heat cable is off. Dangerous temperature reached.");
       #endif
     }
+
+    if ((T0Temp <= (TargetTemp - DeltaT)) && (Heat0State != 1)){
+      Heat0State = 1;
+      LastT0HeatStart = (TimeMo * 1000000) + (long(TimeDay) * 10000) + (TimeH * 100) + TimeM; //mmddhhmm
+      RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
+      #ifdef DEBUG
+        Serial.println("Heater in water is on.");
+      #endif
+    }
+    else if((T0Temp >= TargetTemp) && (Heat0State == 1)){
+      Heat0State = 0;
+      LastT0HeatEnd = (TimeMo * 1000000) + (long(TimeDay) * 10000) + (TimeH * 100) + TimeM; //mmddhhmm
+      RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
+      #ifdef DEBUG
+        Serial.println("Heater in water is off.");
+      #endif
+    }
+
   }
   else{
     if(FirstRun == 0){
@@ -751,20 +775,5 @@ void Heat(){
         Serial.println("Temp isn´t read.");
       #endif
     }
-  }
-
-  if ((T0Temp <= (TargetTemp - DeltaT)) && (Heat0State != 1)){
-    Heat0State = 1;
-    RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
-    #ifdef DEBUG
-      Serial.println("Heater in water is on.");
-    #endif
-  }
-  else if((T0Temp >= TargetTemp) && (Heat0State == 1)){
-    Heat0State = 0;
-    RellayInvertSwitch(Heat0, Heat0State, "Heat0 - water heater");
-    #ifdef DEBUG
-      Serial.println("Heater in water is off.");
-    #endif
   }
 }
