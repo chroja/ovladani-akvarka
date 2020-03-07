@@ -1,6 +1,11 @@
 /*
 --------------------------NOTES---------------------------------
-Use LIB https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
+Use LIB
+LED DRIVER                                    https://github.com/MrKrabat/LED-Strip-Driver-Module for RGB Strip
+RTClib                                        https://navody.arduino-shop.cz/docs/texty/0/7/rtclib.zip
+DS18B20                                       https://navody.arduino-shop.cz/docs/texty/0/14/dallastemperature.zip
+OneWire                                       https://navody.arduino-shop.cz/docs/texty/0/15/onewire.zip
+
 
 
 sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
@@ -21,6 +26,7 @@ pumpa 520ms/ml
 #define DRY_RUN
 #define RESTART
 #define SERIAL_INFO
+#define FERTILIZATION
 
 uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
 #ifdef DRY_RUN
@@ -28,6 +34,16 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 #else
   uint8_t T1SensorAddress[8] = { 0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 }; //cable sensor
 #endif
+
+
+#define Rellay1 34
+#define Rellay2 36
+#define Rellay3 38
+#define Rellay4 40
+#define Rellay5 35
+#define Rellay6 37
+#define Rellay7 39
+#define Rellay8 41
 
 
 //variales led pin (W D22-D27)
@@ -44,11 +60,11 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 #define BLedPwmPin 46
 
 //temp
-#define Heat0  37//heat water rellay
-#define Heat1  39//heat cable rellay
-#define TempPin 40
+#define Heat0  Rellay6//heat water rellay
+#define Heat1  Rellay5//heat cable rellay
+#define TempPin 42
 #define RestartSensorPin 41
-#define RestartPin 53
+#define RestartPin 43
 
 
 
@@ -60,12 +76,12 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 
 //declarate variables
 //for RTC
-int SetRtcY = 2019;
-int SetRtcMo = 12;
-int SetRtcD = 25;
-int SetRtcH = 18;
-int SetRtcM = 33;
-int SetRtcS = 30;
+int SetRtcY = 2020;
+int SetRtcMo = 01;
+int SetRtcD = 04;
+int SetRtcH = 13;
+int SetRtcM = 03;
+int SetRtcS = 00;
 
 // var for date
 int TimeY = 0;
@@ -684,7 +700,7 @@ float ReadTemperature(DeviceAddress deviceAddress){
   return tempC;
 }
 
-void PrintSensorAdress (byte  SensorName[8]){
+void PrintSensorAdress (byte SensorName[8]){
   byte i;
   //byte SensorName[8];
   for( i = 0; i < 8; i++) {
