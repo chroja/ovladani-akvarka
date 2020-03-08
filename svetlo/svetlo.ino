@@ -39,11 +39,12 @@ pumpa 520ms/ml
 #define LedW6 27
 
 //Led RGB PINOUT
-#define RLedPwmPin 44
-#define GLedPwmPin 45
-#define BLedPwmPin 46
-
-
+#define RGBLedNum 4
+#define RGBDataPin 2
+#define RGBClockPin 3
+byte Red = 255;
+byte Green = 255;
+byte Blue = 255;
 
 
 
@@ -51,7 +52,9 @@ pumpa 520ms/ml
 #include <Wire.h>
 #include "RTClib.h"
 #include <OneWire.h>
+#include <FastLED.h>
 
+CRGB RBGLeds[RGBLedNum];
 
 //declarate variables
 //for RTC
@@ -90,7 +93,7 @@ unsigned long RtcCurrentMillis = 0;
 int StartLedHourW = 11; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 00;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 20;
+int EndLedHourW = 21;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 1; //in minutes
@@ -146,6 +149,9 @@ void setup () {
   SetRTC();
   #endif
 
+  FastLED.addLeds<P9813, RGBDataPin, RGBClockPin, RGB>(RBGLeds, RGBLedNum);  // BGR ordering is typical
+
+
   initOutput();
 
   GetTimeSetup();
@@ -173,7 +179,6 @@ void loop () {
 
   //GetTime();
   LedW();
-  LedRGB();
 
   #ifdef SERIAL_INFO
     SerialInfo();
@@ -217,13 +222,13 @@ void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
   pinMode(LedW6, OUTPUT);
   digitalWrite(LedW6, LOW);
 
-  //GRB led;
+/*  //GRB led;
   pinMode(RLedPwmPin, OUTPUT);
   analogWrite(RLedPwmPin, 0);
   pinMode(GLedPwmPin, OUTPUT);
   analogWrite(GLedPwmPin, 0);
   pinMode(GLedPwmPin, OUTPUT);
-  analogWrite(GLedPwmPin, 0);
+  analogWrite(GLedPwmPin, 0);*/
 
 
 }
@@ -295,10 +300,22 @@ void LedW(){
   if ((TimeHM >= StartLedW) && (TimeHM < EndLedW) && (NumLedWOn != NumLedW)){
     NumLedWOn = NumLedW;
     LedWSwitch();
+    for (int i = 0; i < RGBLedNum; i++) {
+      RBGLeds[i] = CRGB(Red,Green,Blue);
+    }
+    FastLED.show();
+
   }
-  else if((TimeHM < StartLedW) || (TimeHM >= EndLedW) && (NumLedWOn != 0)) {
+  else if(((TimeHM < StartLedW) || (TimeHM >= EndLedW)) && (NumLedWOn != 0)) {
     NumLedWOn = 0;
     LedWSwitch();
+    for (int i = 0; i < RGBLedNum; i++) {
+      RBGLeds[i] = CRGB(0,0,0);
+    }
+    FastLED.show();
+    }
+    else{
+
     }
   }
 
@@ -341,34 +358,6 @@ void LedWSwitch() {
   }
 }
 
-void LedRGB(){
-  if(NumLedWOn == NumLedW){
-    RGB_color(RLedValue, GLedValue, BLedValue);
-    }
-  else if (NumLedWOn < NumLedW){
-    RGB_color(0, 0, 0);
-    }
-  else{
-
-  }
-}
-
-void RGB_color(int red, int green, int blue){
-
-  if((red != RLedValueOld) || (green != GLedValueOld) || (blue != BLedValueOld)){
-    analogWrite(RLedPwmPin, red);
-    analogWrite(GLedPwmPin, green);
-    analogWrite(BLedPwmPin, blue);
-
-
-    #ifdef DEBUG
-    Serial.println("RGB color set to (RGB 0-255): " + String(red) + ", " + String(green) + ", " + String(blue));
-    RLedValueOld = red;
-    GLedValueOld = green;
-    BLedValueOld = blue;
-    #endif
-  }
-}
 
 void SerialInfoSetup(){
   #ifdef DEBUG
@@ -377,7 +366,7 @@ void SerialInfoSetup(){
     Serial.println("Version: " + String(SetRtcY) + String(SetRtcMo) + String(SetRtcD));
     Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
     Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
-    Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
+    //Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
     Serial.println("---------------------END SETUP INFO------------------------");
 
 
