@@ -1,21 +1,35 @@
-#include <LEDStripDriver.h>
+#define RGBLedNum 4
+#define RGBDataPin 2
+#define RGBClockPin 3
+int speed = 30;
 
-// use two available GPIO pins from your board
-// DIN=GPIO16, CIN=GPIO14 in this example
-LEDStripDriver led = LEDStripDriver(10, 11);
+#include <FastLED.h>
+
+CRGB RBGLeds[RGBLedNum];
 
 void setup() {
   // put your setup code here, to run once:
+  FastLED.addLeds<P9813, RGBDataPin, RGBClockPin, RGB>(RBGLeds, RGBLedNum);  // BGR ordering is typical
+
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  led.setColor(255, 0, 0); // RGB
-  delay(100);
-  led.setColor(0,255,0); // String
-  delay(100);
-  led.setColor(0,0,255); // HEX
-  delay(100);
-  led.setColor(); // turn off
-  delay(1000);
+  for (int i = 0; i < RGBLedNum; i++) {
+      RBGLeds[i] = CRGB(255,0,0);
+      FastLED.show();
+      delay ;
+      RBGLeds[i] = CRGB(0,255,0);
+      FastLED.show();
+      delay (speed);
+      RBGLeds[i] = CRGB(0,0,255);
+      FastLED.show();
+      delay (speed);
+      RBGLeds[i] = CRGB(255,255,255);
+      FastLED.show();
+      delay (speed);
+      RBGLeds[i] = CRGB(0,0,0);
+      FastLED.show();
+      delay (speed);
+    }
 }
