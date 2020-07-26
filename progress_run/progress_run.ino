@@ -22,17 +22,17 @@ pumpa 520ms/ml
 //#define SET_RTC
 //#define DEBUG_LED
 #define TEMP_OFFSET
-//#define SEARCH_ADDRESS_DS18B20
+#define SEARCH_ADDRESS_DS18B20
 #define DRY_RUN
 #define RESTART
 #define SERIAL_INFO
 #define FERTILIZATION
 
-uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor
+uint8_t T0SensorAddress[8] = { 0x28, 0xC4, 0xF7, 0x79, 0xA2, 0x16, 0x03, 0x8C }; //water sensor
 #ifdef DRY_RUN
-  uint8_t T1SensorAddress[8] = { 0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0 }; //cable sensor - test!
+  uint8_t T1SensorAddress[8] = { 0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59 }; //cable sensor - test!
 #else
-  uint8_t T1SensorAddress[8] = { 0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 }; //cable sensor
+  uint8_t T1SensorAddress[8] = { 0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0 }; //cable sensor
 #endif
 
 
@@ -62,7 +62,7 @@ uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 };
 //temp
 #define Heat0  Rellay6//heat water rellay
 #define Heat1  Rellay5//heat cable rellay
-#define TempPin 42
+#define TempPin 39
 #define RestartSensorPin 41
 #define RestartPin 43
 
@@ -128,7 +128,7 @@ float T1TempNoOffset = 0;
   float T1Offset = 0;
 #endif
 int DSCountSensor = 0;
-int DSUseSensor = 2;
+int DSUseSensor = 4;
 int DSSetupConnectAttemp = 0;
 int NextReadTepmMin = 0;
 int LastReadTemp;

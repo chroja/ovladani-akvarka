@@ -59,10 +59,10 @@ CRGB RBGLeds[RGBLedNum];
 //declarate variables
 //for RTC
 int SetRtcY = 2020;
-int SetRtcMo = 03;
-int SetRtcD = 29;
-int SetRtcH = 20;
-int SetRtcM = 16;
+int SetRtcMo = 05;
+int SetRtcD = 31;
+int SetRtcH = 21;
+int SetRtcM = 15;
 int SetRtcS = 30;
 
 // var for date
@@ -90,7 +90,7 @@ unsigned long RtcCurrentMillis = 0;
 
 
 //var for LEDs
-int StartLedHourW = 9; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 7; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 30;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;

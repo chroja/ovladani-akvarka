@@ -17,7 +17,8 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 #define lcdSvit 10
 unsigned long currentMillis, svitMillis;
 int RunMill, RunSec, RunMin, RunHr, RunDay;
-unsigned long RunX = 123456789;
+unsigned long RunX = 0;
+unsigned long offset = 237600;
 
 void setup() {
   // zahájení komunikace po sériové lince
@@ -64,23 +65,26 @@ void loop() {
       digitalWrite(lcdSvit,LOW);
     }
 
-  RunX = currentMillis/1000;
+  RunX = (currentMillis/1000);
+  
+  RunX = RunX + offset;
   Serial.print("RunX: ");
   Serial.println(RunX);
-  
   RunSec = RunX % 60;
   Serial.print("RunSec: ");
   Serial.println(RunSec);
-  RunX = RunX/60;
+  RunX = RunX/60;//min
+  
   RunMin = RunX % 60;
   Serial.print("RunMin: ");
   Serial.println(RunMin);
-  RunX = RunX/60;
-  RunHr = RunX % 60;
+  RunX = RunX/60;//h
+  
+  RunHr = RunX % 24;
   Serial.print("RunHr: ");
   Serial.println(RunHr);
-  RunX = RunX/60;
-  RunDay = RunX % 24;
+  RunDay = RunX / 24;
+  
   Serial.print("RunDay: ");
   Serial.println(RunDay);
 
