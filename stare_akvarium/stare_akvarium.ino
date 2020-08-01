@@ -17,6 +17,17 @@ pumpa 520ms/ml
 
 
 */
+
+
+//librlies
+#include <Wire.h>
+#include "RTClib.h"
+#include <OneWire.h>
+#include <FastLED.h>
+#include <DallasTemperature.h>
+#include <DS3231.h>
+#include "U8glib.h"
+
 // defines
 #define DEBUG
 //#define SET_RTC
@@ -25,8 +36,25 @@ pumpa 520ms/ml
 #define RESTART
 #define SERIAL_INFO
 #define DS3231_USE
+#define DRY_RUN
 
-uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor
+//water sensor
+#ifdef DRY_RUN
+  uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor used on desk - 2wire! red - sign, white - gnd, 4K7 sign -vcc
+#else
+  uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
+#endif
+
+//led sensor
+#ifdef DRY_RUN
+  uint8_t T1SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //led sensor used on desk
+#else
+  uint8_t T1SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
+#endif
+
+
+
+U8GLIB_SH1106_128X64 Oled(0x3c);
 
 //variales led pin (W D22-D27)
 #define LedW1 22
@@ -73,13 +101,7 @@ byte Blue = 255;
 
 
 
-//librlies
-#include <Wire.h>
-#include "RTClib.h"
-#include <OneWire.h>
-#include <FastLED.h>
-#include <DallasTemperature.h>
-#include <DS3231.h>
+
 
 CRGB RBGLeds[RGBLedNum];
 
@@ -140,15 +162,15 @@ int BLedValueOld;
 //temp
 //DS tem sensors
 float T0Temp = 0; //temp on T0 with calibration offset
-//float T1Temp = 0; //temp on T1 with calibration offset
+float T1Temp = 0; //temp on T1 with calibration offset
 float T0TempNoOffset = 0;
-//float T1TempNoOffset = 0;
+float T1TempNoOffset = 0;
 #ifdef TEMP_OFFSET
   float T0Offset = 0;
-  //float T1Offset = -0.54;
+  float T1Offset = 0;
 #else
   float T0Offset = 0;
-  //float T1Offset = 0;
+  float T1Offset = 0;
 #endif
 /*
 int DSCountSensor = 0;
@@ -173,13 +195,15 @@ bool HeaterState = 0;
 //unsigned long LastT0HeatEnd = 0;
 //unsigned long LastT1HeatEnd = 0;
 
-
-
+float SafeLedTemp = 25;  //degrees
+float MaximumLedTemp = 65; //degrees
+int PrevLedWOn;
 
 
 //time variable
 int DEBUG_TimeS = 0;
 bool FirstRun = 0;
+unsigned long  OledRefresh = 0;
 
 // add RTC instance
 #ifdef DS3231_USE
@@ -261,6 +285,8 @@ void setup () {
   SetRTC();
   #endif
 
+
+
   FastLED.addLeds<P9813, RGBDataPin, RGBClockPin, RGB>(RBGLeds, RGBLedNum);  // BGR ordering is typical
   for (int i = 0; i < RGBLedNum; i++) {
     RBGLeds[i] = CRGB(0,0,0);
@@ -279,18 +305,26 @@ void setup () {
   CableHeat.pin = RelayPin1;
   CableHeat.type = NC;
   pinMode(CableHeat.pin, OUTPUT);
+  RelayOff(CableHeat);
+
 
   Heater.pin = RelayPin2;
   Heater.type = NC;
   pinMode(Heater.pin, OUTPUT);
+  RelayOff(Heater);
+
 
   Relay3.pin = RelayPin3;
   Relay3.type = NO;
   pinMode(Relay3.pin, OUTPUT);
+  RelayOff(Relay3);
+
 
   Relay4.pin = RelayPin4;
   Relay4.type = NO;
   pinMode(Relay4.pin, OUTPUT);
+  RelayOff(Relay4);
+
 
   Wire.begin();
 
@@ -300,7 +334,6 @@ void setup () {
   I2CScanner();
 
 
-  //initOutput();
 
   GetTimeSetup();
 
@@ -320,17 +353,12 @@ void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
 void loop () {
   if (millis() >= (RtcCurrentMillis+1000)){
-    #ifdef DEBUG
-    Serial.println("time read");
-  //  Serial.println(RtcCurrentMillis);
-    #endif
     GetTime();
     RtcCurrentMillis = millis();
 
   }
 
-  //GetTime();
-  //LedW();
+
 
   LedWOn();
   LedWOff();
@@ -342,15 +370,10 @@ void loop () {
   Heat();
   FirstRun = 1;
   TimeRestart();
+  CheckLedTemp();
+  ShowOled();
 
-  /*
-  zapniRele(rele1);
-  zapniRele(rele2);
-  delay(1000);
-  vypniRele(rele1);
-  vypniRele(rele2);
-  delay(1000);
-  */
+
 }
 
 //****************************************** FUNCTION ****************************************
@@ -366,16 +389,11 @@ void SetRTC(){
     rtc.setDateTime(__DATE__, __TIME__);
   #else
     DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
-    Serial.println();
-    Serial.println("---------- Time changed ----------");
-    Serial.print("New time is: ");
-    Serial.print(SetRtcH);
-    Serial.print(':');
-    Serial.print(SetRtcM);
-    Serial.print(':');
-    Serial.println(SetRtcS);
-    delay (1000);
   #endif
+
+  Serial.println();
+  Serial.println("---------- Time changed ----------");
+
   //adjus time in RTC module
   //DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
 /*  #ifdef DEBUG
@@ -389,24 +407,6 @@ void SetRTC(){
     Serial.println(SetRtcS);
     delay (2000);
   #endif*/
-}
-
-void initOutput(){ //inicializace output ninu, nastavení na vychozí hodnoty
-  //white led
-
-  pinMode(LedW1, OUTPUT);
-  digitalWrite(LedW1, LOW);
-  pinMode(LedW2, OUTPUT);
-  digitalWrite(LedW2, LOW);
-  pinMode(LedW3, OUTPUT);
-  digitalWrite(LedW3, LOW);
-  pinMode(LedW4, OUTPUT);
-  digitalWrite(LedW4, LOW);
-  pinMode(LedW5, OUTPUT);
-  digitalWrite(LedW5, LOW);
-  pinMode(LedW6, OUTPUT);
-  digitalWrite(LedW6, LOW);
-
 }
 
 void GetTimeSetup(){
@@ -485,28 +485,7 @@ void GetTime(){
 }
 
 
-void LedW(){
-  if ((TimeHM >= StartLedW) && (TimeHM < EndLedW) && (NumLedWOn != NumLedW)){
-    NumLedWOn = NumLedW;
-    LedWSwitch();
-    for (int i = 0; i < RGBLedNum; i++) {
-      RBGLeds[i] = CRGB(Red,Green,Blue);
-    }
-    FastLED.show();
 
-  }
-  else if(((TimeHM < StartLedW) || (TimeHM >= EndLedW)) && (NumLedWOn != 0)) {
-    NumLedWOn = 0;
-    LedWSwitch();
-    for (int i = 0; i < RGBLedNum; i++) {
-      RBGLeds[i] = CRGB(0,0,0);
-    }
-    FastLED.show();
-    }
-    else{
-
-    }
-  }
 
 void LedWOn(){
   int LedWOffset;
@@ -737,6 +716,7 @@ void SerialInfo(){
       Serial.println("Numbers LED stip white on: " + String(NumLedWOn));
       Serial.println("Heat cable status: " + String(CableHeatState));
       Serial.println("Heater  status: " + String(HeaterState));
+      Serial.println("T0 Temp: " + String(T0Temp));
 
       DEBUG_TimeS = TimeS;
       Serial.println();
@@ -779,25 +759,34 @@ void TimeRestart(){
 void GetTemp(){
   if (NextReadTepmMs <= millis()){
     #ifdef DEBUG
-     Serial.println("------ Start measure temp ------");
+     Serial.println("******** Start measure temp *******\n");
     #endif
     SensorsDS.requestTemperatures();
     T0TempNoOffset = ReadTemperature(T0SensorAddress);
+    T1TempNoOffset = ReadTemperature(T1SensorAddress);
     NextReadTepmMs = NextReadTepmMs + TempReadPeriod;
     LastReadTemp = TimeHM;
     #ifdef DEBUG
       Serial.println("Temp read.");
-      Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "C");
+      Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
+
+      Serial.println("Temp read.");
+      Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "°C");
+
       Serial.println("Current measure in time: " + String(LastReadTemp));
     #endif
-    if (((T0TempNoOffset > (-127)) && (T0TempNoOffset < (85)))){
-      ErrorTempCurrent = 0;
-      T0Temp = T0TempNoOffset + T0Offset;
+    if ((T0TempNoOffset > -127) && (T0TempNoOffset < 85)){
+      if ((T1TempNoOffset > -127) && (T1TempNoOffset < 85)){
+        ErrorTempCurrent = 0;
+        T0Temp = T0TempNoOffset + T0Offset;
+        T1Temp = T1TempNoOffset + T1Offset;
 
-      #ifdef DEBUG
-        Serial.println("Temp measure is ok.");
-        Serial.println("T0 with offset temp is: " + String(T0Temp) + "C");
-      #endif
+        #ifdef DEBUG
+          Serial.println("\n--- Temp measure is ok. ---\n");
+          Serial.println("T0 with offset temp is: " + String(T0Temp) + "°C");
+          Serial.println("T1 with offset temp is: " + String(T1Temp) + "°C");
+        #endif
+      }
     }
     else if (ErrorTempCurrent < ErrorTempMax){
       #ifdef DEBUG
@@ -809,7 +798,7 @@ void GetTemp(){
     else{
       Restart("Lot of error measure. Total: ", ErrorTempCurrent);
     }
-    Serial.println("------ END measure temp ------");
+    Serial.println("\n******* END measure temp **********");
     Serial.println(); Serial.println();
   }
 }
@@ -932,4 +921,67 @@ void I2CScanner(){
    Serial.println("No I2C devices found\n");
  else
    Serial.println("done\n");
+}
+
+void ShowOled(){
+  if (millis()-OledRefresh > 100) {
+    Oled.firstPage();
+    do {
+      TempTimeStatusPage();
+    }
+  while( Oled.nextPage());
+    OledRefresh = millis();
+  }
+}
+
+void TempTimeStatusPage(void){
+  Oled.setFont(u8g_font_unifont);
+  Oled.setPrintPos(0, 10);
+  Oled.print("Time: "); Oled.print(TimeH);  Oled.print(":");  Oled.print(TimeM);  Oled.print(":");  Oled.print(TimeS);
+  Oled.setPrintPos(0, 25);
+  Oled.print("Water: "); Oled.print(T0Temp);  Oled.print(" C");
+  Oled.setPrintPos(0, 40);
+  Oled.print("Heat cable: ");
+  if(CableHeatState == 0){
+    Oled.print("OFF");
+  }
+  else if (CableHeatState == 1){
+    Oled.print("ON");
+  }
+  else {
+    Oled.print("ERR");
+  }
+  Oled.setPrintPos(0, 55);
+  Oled.print("Heater: ");
+  if(HeaterState == 0){
+    Oled.print("OFF");
+  }
+  else if (HeaterState == 1){
+    Oled.print("ON");
+  }
+  else {
+    Oled.print("ERR");
+  }
+}
+
+void CheckLedTemp(){
+  if(StatusLedStrip == 1){
+    if (T1Temp > MaximumLedTemp){
+      PrevLedWOn = NumLedWOn;
+      NumLedWOn = 0;
+      if (NumLedWOn != PrevLedWOn){
+        Serial.println("\n\n********** Temperature led light exceed maximum operating temperature **********\n");
+        LedWSwitch();
+      }
+    }
+    if (T1Temp > SafeLedTemp){
+      PrevLedWOn = NumLedWOn;
+      NumLedWOn = map(T1Temp, SafeLedTemp, MaximumLedTemp, NumLedW-1, 0);
+      if (NumLedWOn != PrevLedWOn){
+        Serial.println("\n\n***** Temperature led light exceed safety operating temperature *****\n");
+        Serial.print("Now lighting: " + String(NumLedWOn) + " white led strip(s)\n");
+        LedWSwitch();
+      }
+    }
+  }
 }
