@@ -36,7 +36,7 @@ pumpa 520ms/ml
 #define RESTART
 #define SERIAL_INFO
 #define DS3231_USE
-#define DRY_RUN
+//#define DRY_RUN
 
 //water sensor
 #ifdef DRY_RUN
@@ -49,7 +49,7 @@ pumpa 520ms/ml
 #ifdef DRY_RUN
   uint8_t T1SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //led sensor used on desk
 #else
-  uint8_t T1SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
+  uint8_t T1SensorAddress[8] = { 0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F }; //water sensor used in aquarium
 #endif
 
 
