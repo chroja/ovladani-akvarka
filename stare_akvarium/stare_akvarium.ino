@@ -27,6 +27,7 @@ pumpa 520ms/ml
 #include <DallasTemperature.h>
 #include <DS3231.h>
 #include "U8glib.h"
+#include <avr/wdt.h>
 
 // defines
 #define DEBUG
@@ -36,18 +37,22 @@ pumpa 520ms/ml
 #define RESTART
 #define SERIAL_INFO
 #define DS3231_USE
-//#define DRY_RUN
+#define DRY_RUN
+#define CUSTOM_BOARD
+#define MESAURE_LED_TEMP
 
 //water sensor
 #ifdef DRY_RUN
-  uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor used on desk - 2wire! red - sign, white - gnd, 4K7 sign -vcc
+  //uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor used on desk - 2wire! red - sign, white - gnd, 4K7 sign -vcc
+  uint8_t T0SensorAddress[8] = { 0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0 }; //water sensor used on desk
 #else
   uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
 #endif
 
 //led sensor
 #ifdef DRY_RUN
-  uint8_t T1SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //led sensor used on desk
+  //uint8_t T1SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //led sensor used on desk
+  uint8_t T1SensorAddress[8] = { 0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59 }; //led sensor used on desk
 #else
   uint8_t T1SensorAddress[8] = { 0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F }; //water sensor used in aquarium
 #endif
@@ -64,12 +69,18 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
 #define LedW5 26
 #define LedW6 27
 
+#define LightBtnPin 2
+
 #define RelayPin1 34
 #define RelayPin2 36
 #define RelayPin3 38
 #define RelayPin4 40
 
-#define TempPin 42
+#ifdef CUSTOM_BOARD
+  #define TempPin 39
+#else
+  #define TempPin 43
+#endif
 
 #define NO 1
 #define NC 0
@@ -98,10 +109,6 @@ rele_t Relay4;
 byte Red = 255;
 byte Green = 25;
 byte Blue = 255;
-
-
-
-
 
 CRGB RBGLeds[RGBLedNum];
 
@@ -139,8 +146,8 @@ unsigned long RtcCurrentMillis = 0;
 
 
 //var for LEDs
-int StartLedHourW = 7; // rozsviti se prni LED, postupne se budou zapinat dalsi
-int StartLedMinuteW = 30;
+int StartLedHourW = 8; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedMinuteW = 00;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;
 int EndLedMinuteW = 30; //zhasne poslední LED, postupnw zhasnou vsechny
@@ -149,6 +156,9 @@ int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0;
+byte ModeLed = 1; // 0 = off; 1 = auto; 3 = off 
+byte PrevModeLed = 0;
+
 int OldNumLedWOffset;
 
 //RGB val
@@ -180,7 +190,7 @@ int DSSetupConnectAttemp = 0;
 unsigned long NextReadTepmMs = 0;
 int NextReadTepmMin = 0;
 int LastReadTemp;
-int ErrorTempMax = 10;
+int ErrorTempMax = 1000;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
@@ -212,6 +222,10 @@ RTCDateTime DateTime;
 #else
 RTC_DS1307 DS1307;
 #endif
+
+bool LightBtnState = 0;
+bool PrevLightBtnState = 0;
+char LightBtnDir = 1;
 
 
 void RelayOn(rele_t vstup) {
@@ -262,6 +276,8 @@ char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "p
 //****************************************** SETUP ****************************************
 
 void setup () {
+
+  wdt_enable(WDTO_2S);
 //  #ifdef DEBUG
   // serial comunication via USB
   Serial.begin(115200);
@@ -299,6 +315,8 @@ void setup () {
   initPin(LedW4);
   initPin(LedW5);
   initPin(LedW6);
+
+  pinMode(LightBtnPin, INPUT);
 
 
 
@@ -352,14 +370,19 @@ void(* resetFunc) (void) = 0; //declare reset function @ address 0
 //****************************************** LOOP ****************************************
 
 void loop () {
+  wdt_reset();// make sure this gets called at least once every 8 seconds!
+
+
   if (millis() >= (RtcCurrentMillis+1000)){
     GetTime();
     RtcCurrentMillis = millis();
 
   }
 
+  LightBtnRead();
 
 
+  Led();
   LedWOn();
   LedWOff();
 
@@ -759,12 +782,19 @@ void TimeRestart(){
 
 void GetTemp(){
   if (NextReadTepmMs <= millis()){
+      LedWSwitch(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
     #ifdef DEBUG
      Serial.println("******** Start measure temp *******\n");
     #endif
     SensorsDS.requestTemperatures();
     T0TempNoOffset = ReadTemperature(T0SensorAddress);
-    T1TempNoOffset = ReadTemperature(T1SensorAddress);
+
+    #ifdef MESAURE_LED_TEMP
+      T1TempNoOffset = ReadTemperature(T1SensorAddress);
+    #else 
+      T1TempNoOffset = T0TempNoOffset;
+    #endif
+    
     NextReadTepmMs = NextReadTepmMs + TempReadPeriod;
     LastReadTemp = TimeHM;
     #ifdef DEBUG
@@ -986,3 +1016,61 @@ void CheckLedTemp(){
     }
   }
 }
+
+
+void Led(){
+  if (ModeLed == 0){
+    if (PrevModeLed != 0)  {
+      PrevModeLed = ModeLed;
+      Serial.println("Led set to off mode.");
+      NumLedWOn = 0;
+      LedWSwitch();
+    }
+  }
+  else if (ModeLed == 2) {
+    if (PrevModeLed != 2) {
+      PrevModeLed = ModeLed;
+      Serial.println("Led set to on mode.");
+      NumLedWOn = 6;
+      LedWSwitch();
+    }
+  }
+  else if (ModeLed == 1){
+    if (PrevModeLed != 1){
+      PrevModeLed = ModeLed;
+      Serial.println("Led set to auto mode.");
+    }
+    LedWOn();
+    LedWOff();
+  }
+  else
+  {
+    //Serial.println("invalid set Led mode");
+  }
+ }
+
+ void LightBtnRead (){
+   LightBtnState = digitalRead(LightBtnPin);
+   if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
+     delay(20);
+     if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
+      ModeLed = ModeLed + LightBtnDir;
+      LightBtnState = digitalRead(LightBtnPin);
+      Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLed));
+       if((ModeLed == 0) || (ModeLed == 2)){
+        LightBtnDir = LightBtnDir * (-1);
+        if(LightBtnDir > 0){
+          Serial.println("func LightBtnRead -- next LightBtnDir: +");
+        }
+        if(LightBtnDir < 0){
+          Serial.println("func LightBtnRead -- next LightBtnDir: -");
+        }
+        
+      }
+     }
+   }
+  PrevLightBtnState = LightBtnState;
+
+
+
+ }
