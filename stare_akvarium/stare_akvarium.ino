@@ -37,16 +37,18 @@ pumpa 520ms/ml
 #define RESTART
 #define SERIAL_INFO
 #define DS3231_USE
-#define DRY_RUN
-#define CUSTOM_BOARD
-#define MESAURE_LED_TEMP
+//#define DRY_RUN
+//#define CUSTOM_BOARD
+//#define MESAURE_LED_TEMP
 
 //water sensor
 #ifdef DRY_RUN
   //uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor used on desk - 2wire! red - sign, white - gnd, 4K7 sign -vcc
   uint8_t T0SensorAddress[8] = { 0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0 }; //water sensor used on desk
 #else
-  uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
+ // uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
+ 
+  uint8_t T0SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //water sensor used in aquarium
 #endif
 
 //led sensor
@@ -78,8 +80,10 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
 
 #ifdef CUSTOM_BOARD
   #define TempPin 39
+  #define LightBtnPin 2
 #else
   #define TempPin 43
+  #define LightBtnPin 6
 #endif
 
 #define NO 1
@@ -146,11 +150,11 @@ unsigned long RtcCurrentMillis = 0;
 
 
 //var for LEDs
-int StartLedHourW = 8; // rozsviti se prni LED, postupne se budou zapinat dalsi
+int StartLedHourW = 11; // rozsviti se prni LED, postupne se budou zapinat dalsi
 int StartLedMinuteW = 00;
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;
-int EndLedMinuteW = 30; //zhasne poslední LED, postupnw zhasnou vsechny
+int EndLedMinuteW = 40; //zhasne poslední LED, postupnw zhasnou vsechny
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
