@@ -37,8 +37,8 @@ pumpa 520ms/ml
 #define RESTART
 #define SERIAL_INFO
 #define DS3231_USE
-//#define DRY_RUN
-//#define CUSTOM_BOARD
+#define DRY_RUN
+#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 
 //water sensor
@@ -160,7 +160,7 @@ int SpeedLedW = 5; //in minutes
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0;
-byte ModeLed = 1; // 0 = off; 1 = auto; 3 = off 
+byte ModeLed = 1; // 0 = off; 1 = auto; 2 = off 
 byte PrevModeLed = 0;
 
 int OldNumLedWOffset;
@@ -321,7 +321,7 @@ void setup () {
   initPin(LedW6);
 
   pinMode(LightBtnPin, INPUT);
-
+  LightBtnState = digitalRead(LightBtnPin);
 
 
   CableHeat.pin = RelayPin1;
@@ -384,11 +384,9 @@ void loop () {
   }
 
   LightBtnRead();
-
-
   Led();
-  LedWOn();
-  LedWOff();
+  //LedWOn();
+  //LedWOff();
 
   #ifdef SERIAL_INFO
     SerialInfo();
@@ -1060,6 +1058,7 @@ void Led(){
      if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
       ModeLed = ModeLed + LightBtnDir;
       LightBtnState = digitalRead(LightBtnPin);
+      Serial.println(digitalRead(LightBtnPin));
       Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLed));
        if((ModeLed == 0) || (ModeLed == 2)){
         LightBtnDir = LightBtnDir * (-1);
