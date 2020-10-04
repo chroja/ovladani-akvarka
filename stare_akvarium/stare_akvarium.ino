@@ -15,6 +15,9 @@ Set
 
 pumpa 520ms/ml
 
+COM6 - meduino
+com10 - mega akvarko
+
 
 */
 
@@ -147,16 +150,20 @@ int NTimeHM = 0;
 
 
 unsigned long RtcCurrentMillis = 0;
+unsigned long TimeStamp = 0;
 
 
 //var for LEDs
-int StartLedHourW = 11; // rozsviti se prni LED, postupne se budou zapinat dalsi
-int StartLedMinuteW = 00;
+byte StartLedHourW = 16; // rozsviti se prni LED, postupne se budou zapinat dalsi
+byte StartLedMinuteW = 00;
+unsigned long StartLedWTimeStamp = ((StartLedHourW * 3600) + (StartLedMinuteW * 60));
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;
-int EndLedMinuteW = 40; //zhasne poslední LED, postupnw zhasnou vsechny
+int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
+unsigned long EndLedWTimeStamp = ((EndLedHourW * 3600) + (EndLedMinuteW * 60));
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
-int SpeedLedW = 5; //in minutes
+int SpeedLedW = 3; //in minutes
+unsigned int SpeedLedWTimeStamp = SpeedLedW * 60;
 int NumLedW = 6;
 int NumLedWOn = 0;
 byte StatusLedStrip = 0;
@@ -218,6 +225,9 @@ int PrevLedWOn;
 int DEBUG_TimeS = 0;
 bool FirstRun = 0;
 unsigned long  OledRefresh = 0;
+float OledPageShowTime = 2.5; //sec
+unsigned long OledShowCurrentPage = 0;
+byte CurrentPage, PrevPage = 0;
 
 // add RTC instance
 #ifdef DS3231_USE
@@ -398,6 +408,8 @@ void loop () {
   CheckLedTemp();
   ShowOled();
 
+  LedWOn2();
+
 
 }
 
@@ -509,7 +521,10 @@ void GetTime(){
 
 }
 
-
+void LedWOn2(){
+  int NumLedWOn2 = map(TimeStamp, StartLedWTimeStamp, (StartLedWTimeStamp+(NumLedW * SpeedLedWTimeStamp)), 0, NumLedW);
+  Serial.println(NumLedWOn2);
+}
 
 
 void LedWOn(){
@@ -956,24 +971,65 @@ void I2CScanner(){
    Serial.println("done\n");
 }
 
+void OledDrawPages(){
+  if((millis()) >= (OledShowCurrentPage+(OledPageShowTime*1000))){
+    CurrentPage++;
+    Serial.println("print next page");
+    OledShowCurrentPage = millis();
+  }
+
+    switch (CurrentPage)  {
+    case 0 : 
+      OledTimePage();    
+    break;
+    case 1 :
+      OledTempPage();
+    break;
+    case 2 :
+      OledLedModePage();
+    break;
+
+    default:
+      CurrentPage = 0;
+      Serial.println ("Maximum count for pages overflow. Now set current page to 0.");
+    break;
+  }
+}
+
+void OledLeftText(unsigned char Row){ 
+  Oled.setFont(u8g_font_unifont); 
+  Oled.setPrintPos(0, (Row*15)+10);
+}
+
 void ShowOled(){
   if (millis()-OledRefresh > 100) {
     Oled.firstPage();
     do {
-      TempTimeStatusPage();
+      OledDrawPages();
     }
   while( Oled.nextPage());
     OledRefresh = millis();
   }
 }
 
-void TempTimeStatusPage(void){
-  Oled.setFont(u8g_font_unifont);
-  Oled.setPrintPos(0, 10);
-  Oled.print("Time: "); Oled.print(TimeH);  Oled.print(":");  Oled.print(TimeM);  Oled.print(":");  Oled.print(TimeS);
-  Oled.setPrintPos(0, 25);
+void OledTimePage(){
+  OledLeftText(0);
+  Oled.print("Time: "); Oled.print(TimeH);  Oled.print(":");  Oled.print(TimeM);  Oled.print(":");  Oled.print(TimeS); 
+  OledLeftText(1); 
+  Oled.print("Stamp: 86400"); //Oled.print(TimeStamp); 
+  OledLeftText(2);
+  Oled.print("Run: "); Oled.print((millis()/1000)); Oled.print("s");
+  OledLeftText(3);
+  Oled.print("Run: "); Oled.print((millis()/(3600000))); Oled.print(":"); Oled.print((millis()/(60000)) % 60); Oled.print(":"); Oled.print((millis()/1000) % 60); Oled.print(":"); Oled.print((millis()) % 1000);
+ 
+}
+
+void OledTempPage(){
+  OledLeftText(0);
   Oled.print("Water: "); Oled.print(T0Temp);  Oled.print(" C");
-  Oled.setPrintPos(0, 40);
+  OledLeftText(1);
+  Oled.print("Led: "); Oled.print(T1Temp);  Oled.print(" C");
+  OledLeftText(2);
   Oled.print("Heat cable: ");
   if(CableHeatState == 0){
     Oled.print("OFF");
@@ -984,7 +1040,8 @@ void TempTimeStatusPage(void){
   else {
     Oled.print("ERR");
   }
-  Oled.setPrintPos(0, 55);
+
+  OledLeftText(3);
   Oled.print("Heater: ");
   if(HeaterState == 0){
     Oled.print("OFF");
@@ -996,6 +1053,28 @@ void TempTimeStatusPage(void){
     Oled.print("ERR");
   }
 }
+
+void OledLedModePage(){
+  OledLeftText(0);
+  Oled.print("Led mode: ");
+  if (ModeLed == 0){
+    Oled.print("Off");
+  }
+  else if (ModeLed == 1){
+    Oled.print("Auto");
+  }
+  else if (ModeLed == 2){
+    Oled.print("On");
+  }
+  else{
+    Oled.print("ERR");
+  }
+
+  OledLeftText(1);
+  Oled.print("Led Case:"); Oled.print(NumLedWOn);
+
+}
+
 
 void CheckLedTemp(){
   if(StatusLedStrip == 1){
@@ -1047,7 +1126,7 @@ void Led(){
   }
   else
   {
-    //Serial.println("invalid set Led mode");
+    Serial.println("invalid set Led mode");
   }
  }
 
@@ -1073,7 +1152,5 @@ void Led(){
      }
    }
   PrevLightBtnState = LightBtnState;
-
-
-
  }
+
