@@ -496,7 +496,9 @@ void GetTime(){
           TimeH = NTimeH;
           TimeM = NTimeM;
           TimeS = NTimeS;
+          TimeStamp = long (TimeH * 3600) + long(TimeM * 60) + TimeS;
           #ifdef DEBUG
+          Serial.println(TimeStamp);
           Serial.println("Correct time read");
           #endif
         }
@@ -518,12 +520,12 @@ void GetTime(){
       #endif
     }
   TimeHM = (TimeH * 100) + TimeM;
-
 }
 
 void LedWOn2(){
-  int NumLedWOn2 = map(TimeStamp, StartLedWTimeStamp, (StartLedWTimeStamp+(NumLedW * SpeedLedWTimeStamp)), 0, NumLedW);
+  long NumLedWOn2 = map(TimeStamp, StartLedWTimeStamp, (StartLedWTimeStamp+(NumLedW * SpeedLedWTimeStamp)), 0, NumLedW);
   Serial.println(NumLedWOn2);
+  delay (100);
 }
 
 
@@ -1016,7 +1018,7 @@ void OledTimePage(){
   OledLeftText(0);
   Oled.print("Time: "); Oled.print(TimeH);  Oled.print(":");  Oled.print(TimeM);  Oled.print(":");  Oled.print(TimeS); 
   OledLeftText(1); 
-  Oled.print("Stamp: 86400"); //Oled.print(TimeStamp); 
+  Oled.print("Stamp: "); Oled.print(TimeStamp); 
   OledLeftText(2);
   Oled.print("Run: "); Oled.print((millis()/1000)); Oled.print("s");
   OledLeftText(3);
