@@ -19,6 +19,37 @@ COM6 - meduino
 com10 - mega akvarko
 
 
+TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
+
+const int pocetCyklu = 2;
+int pocetPasku = 6;
+int NumLedWOn;
+
+unsigned long Timestamp;
+
+byte StartLedHourW[pocetCyklu] = {16, 4}; // rozsviti se prni LED, postupne se budou zapinat dalsi
+byte StartLedMinuteW[pocetCyklu] = {00, 30};
+unsigned long StartLedWTimeStamp[pocetCyklu];
+unsigned long EndLedWTimeStamp[pocetCyklu];
+unsigned long casPosledniho[pocetCyklu];
+
+void setup() {
+  // put your setup code here, to run once:
+  for (int i = 0; i < pocetCyklu; i++) {
+    StartLedWTimeStamp[i] = ((StartLedHourW[i] * 3600) + (StartLedMinuteW[i] * 60));
+  }
+}
+
+void loop() {
+
+  for (int i = 0; i < pocetCyklu; i++) {
+    if (( Timestamp > StartLedWTimeStamp[i]) && ( Timestamp < EndLedWTimeStamp[i])) {
+      casPosledniho[i] = StartLedWTimeStamp[i] + 5*60;
+      NumLedWOn = map (Timestamp, StartLedWTimeStamp[i], casPosledniho[i], 0, pocetPasku);
+    }
+  }
+}
+
 */
 
 
