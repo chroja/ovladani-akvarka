@@ -7,7 +7,7 @@ DS18B20                                       https://navody.arduino-shop.cz/doc
 OneWire                                       https://navody.arduino-shop.cz/docs/texty/0/15/onewire.zip
 
 
-
+#
 sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
               0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0 vnejsi kratky kabel
               0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 v akva
@@ -18,6 +18,37 @@ pumpa 520ms/ml
 COM6 - meduino
 com10 - mega akvarko
 
+
+TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
+
+const int pocetCyklu = 2;
+int pocetPasku = 6;
+int NumLedWOn;
+
+unsigned long Timestamp;
+
+byte StartLedHourW[pocetCyklu] = {16, 4}; // rozsviti se prni LED, postupne se budou zapinat dalsi
+byte StartLedMinuteW[pocetCyklu] = {00, 30};
+unsigned long StartLedWTimeStamp[pocetCyklu];
+unsigned long EndLedWTimeStamp[pocetCyklu];
+unsigned long casPosledniho[pocetCyklu];
+
+void setup() {
+  // put your setup code here, to run once:
+  for (int i = 0; i < pocetCyklu; i++) {
+    StartLedWTimeStamp[i] = ((StartLedHourW[i] * 3600) + (StartLedMinuteW[i] * 60));
+  }
+}
+
+void loop() {
+
+  for (int i = 0; i < pocetCyklu; i++) {
+    if (( Timestamp > StartLedWTimeStamp[i]) && ( Timestamp < EndLedWTimeStamp[i])) {
+      casPosledniho[i] = StartLedWTimeStamp[i] + 5*60;
+      NumLedWOn = map (Timestamp, StartLedWTimeStamp[i], casPosledniho[i], 0, pocetPasku);
+    }
+  }
+}
 
 */
 
@@ -34,15 +65,16 @@ com10 - mega akvarko
 
 // defines
 #define DEBUG
-//#define SET_RTC
 #define TEMP_OFFSET
 #define SEARCH_ADDRESS_DS18B20
 #define RESTART
 #define SERIAL_INFO
-#define DS3231_USE
 #define DRY_RUN
 #define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
+
+bool SET_RTC = false;
+
 
 //water sensor
 #ifdef DRY_RUN
@@ -120,14 +152,6 @@ byte Blue = 255;
 CRGB RBGLeds[RGBLedNum];
 
 //declarate variables
-//for RTC
-int SetRtcY = 2020;
-int SetRtcMo = 05;
-int SetRtcD = 31;
-int SetRtcH = 21;
-int SetRtcM = 15;
-int SetRtcS = 30;
-
 // var for date
 int TimeY = 0;
 int TimeMo = 0;
@@ -156,11 +180,11 @@ unsigned long TimeStamp = 0;
 //var for LEDs
 byte StartLedHourW = 16; // rozsviti se prni LED, postupne se budou zapinat dalsi
 byte StartLedMinuteW = 00;
-unsigned long StartLedWTimeStamp = ((StartLedHourW * 3600) + (StartLedMinuteW * 60));
+unsigned long StartLedWTimeStamp = ((long(StartLedHourW) * 3600) + (long(StartLedMinuteW) * 60));
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
 int EndLedHourW = 21;
 int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
-unsigned long EndLedWTimeStamp = ((EndLedHourW * 3600) + (EndLedMinuteW * 60));
+unsigned long EndLedWTimeStamp = ((long(EndLedHourW) * 3600) + (long(EndLedMinuteW) * 60));
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 3; //in minutes
 unsigned int SpeedLedWTimeStamp = SpeedLedW * 60;
@@ -193,15 +217,12 @@ float T1TempNoOffset = 0;
   float T0Offset = 0;
   float T1Offset = 0;
 #endif
-/*
-int DSCountSensor = 0;
-int DSUseSensor = 4;
-int DSSetupConnectAttemp = 0;
-*/
+
+
 unsigned long NextReadTepmMs = 0;
 int NextReadTepmMin = 0;
 int LastReadTemp;
-int ErrorTempMax = 1000;
+int ErrorTempMax = 10;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
@@ -211,10 +232,7 @@ float DeltaT = 0.5;
 int Heat1SafeTemp = 28;
 bool CableHeatState = 0;
 bool HeaterState = 0;
-//unsigned long LastT0HeatStart = 0;
-//unsigned long LastT1HeatStart = 0;
-//unsigned long LastT0HeatEnd = 0;
-//unsigned long LastT1HeatEnd = 0;
+
 
 float SafeLedTemp = 35;  //degrees
 float MaximumLedTemp = 65; //degrees
@@ -230,12 +248,11 @@ unsigned long OledShowCurrentPage = 0;
 byte CurrentPage, PrevPage = 0;
 
 // add RTC instance
-#ifdef DS3231_USE
+
 DS3231 rtc;
 RTCDateTime DateTime;
-#else
-RTC_DS1307 DS1307;
-#endif
+
+
 
 bool LightBtnState = 0;
 bool PrevLightBtnState = 0;
@@ -292,29 +309,13 @@ char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "p
 void setup () {
 
   wdt_enable(WDTO_2S);
-//  #ifdef DEBUG
+
   // serial comunication via USB
   Serial.begin(115200);
   Serial.println("------Start setup-----");
-//  #endif
-  #ifdef DS3231_USE
-    rtc.begin();
-  #else
-    // chceck if RTC connected
-    if (! DS1307.begin()) {
-      Serial.println("Hodiny nejsou pripojeny!");
-      while (1);
-    }
-    // kontrolu spuštění obvodu reálného času
-    if (! DS1307.isrunning()) {
-      Serial.println("Hodiny nejsou spusteny! Spoustim nyni..");
-    }
-  #endif
 
-  #ifdef SET_RTC
+  rtc.begin();
   SetRTC();
-  #endif
-
 
 
   FastLED.addLeds<P9813, RGBDataPin, RGBClockPin, RGB>(RBGLeds, RGBLedNum);  // BGR ordering is typical
@@ -364,11 +365,7 @@ void setup () {
   while (!Serial);             // Leonardo: wait for serial monitor
   Serial.println("\nI2C Scanner");
   I2CScanner();
-
-
-
   GetTimeSetup();
-
   DiscoverOneWireDevices();
   SensorsDS.begin();
   //SensorsDSRun();
@@ -408,7 +405,7 @@ void loop () {
   CheckLedTemp();
   ShowOled();
 
-  LedWOn2();
+  //LedWOn2();
 
 
 }
@@ -422,108 +419,73 @@ void initPin(int Pin){
 
 
 void SetRTC(){
-  #ifdef DS3231_USE
+  if(SET_RTC){
     rtc.setDateTime(__DATE__, __TIME__);
-  #else
-    DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
-  #endif
-
-  Serial.println();
-  Serial.println("---------- Time changed ----------");
-
-  //adjus time in RTC module
-  //DS1307.adjust(DateTime(SetRtcY, SetRtcMo, SetRtcD, SetRtcH, SetRtcM, SetRtcS));
-/*  #ifdef DEBUG
+    SET_RTC = false;
     Serial.println();
     Serial.println("---------- Time changed ----------");
-    Serial.print("New time is: ");
-    Serial.print(SetRtcH);
-    Serial.print(':');
-    Serial.print(SetRtcM);
-    Serial.print(':');
-    Serial.println(SetRtcS);
-    delay (2000);
-  #endif*/
+  }
 }
 
 void GetTimeSetup(){
-  #ifdef DS3231_USE
-    DateTime = rtc.getDateTime();
-    TimeY = DateTime.year;
-    TimeMo = DateTime.month;
-    TimeDay = DateTime.day;
-    TimeH = DateTime.hour;
-    TimeM = DateTime.minute;
-    TimeS = DateTime.second;
-  #else
-    DateTime DateTime = DS1307.now();
-    TimeY = DateTime.year();
-    TimeMo = DateTime.month();
-    TimeDay = DateTime.day();
-    TimeH = DateTime.hour();
-    TimeM = DateTime.minute();
-    TimeS = DateTime.second();
-  #endif
-
+  DateTime = rtc.getDateTime();
+  TimeY = DateTime.year;
+  TimeMo = DateTime.month;
+  TimeDay = DateTime.day;
+  TimeH = DateTime.hour;
+  TimeM = DateTime.minute;
+  TimeS = DateTime.second;
   TimeHM = (TimeH * 100) + TimeM;
 
 }
 
 void GetTime(){
-  #ifdef DS3231_USE
-    DateTime = rtc.getDateTime();
-    NTimeY = DateTime.year;
-    NTimeMo = DateTime.month;
-    NTimeDay = DateTime.day;
-    NTimeH = DateTime.hour;
-    NTimeM = DateTime.minute;
-    NTimeS = DateTime.second;
-  #else
-    DateTime DateTime = DS1307.now();
-    NTimeY = DateTime.year();
-    NTimeMo = DateTime.month();
-    NTimeDay = DateTime.day();
-    NTimeH = DateTime.hour();
-    NTimeM = DateTime.minute();
-    NTimeS = DateTime.second();
-  #endif
-    if((NTimeMo > 0) && (NTimeMo < 13)){
-      if((NTimeH >= 0) && (NTimeH < 24)){
-        if((NTimeM >= 0) && (NTimeM < 60)){
-          TimeY = NTimeY;
-          TimeMo = NTimeMo;
-          TimeDay = NTimeDay;
-          TimeH = NTimeH;
-          TimeM = NTimeM;
-          TimeS = NTimeS;
-          #ifdef DEBUG
-          Serial.println("Correct time read");
-          #endif
-        }
-        else{
-          #ifdef DEBUG
-          Serial.println("err minute read");
-          #endif
-        }
+  DateTime = rtc.getDateTime();
+  NTimeY = DateTime.year;
+  NTimeMo = DateTime.month;
+  NTimeDay = DateTime.day;
+  NTimeH = DateTime.hour;
+  NTimeM = DateTime.minute;
+  NTimeS = DateTime.second;
+  if((NTimeMo > 0) && (NTimeMo < 13)){
+    if((NTimeH >= 0) && (NTimeH < 24)){
+      if((NTimeM >= 0) && (NTimeM < 60)){
+        TimeY = NTimeY;
+        TimeMo = NTimeMo;
+        TimeDay = NTimeDay;
+        TimeH = NTimeH;
+        TimeM = NTimeM;
+        TimeS = NTimeS;
+        TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
+        #ifdef DEBUG
+        Serial.println(TimeStamp);
+        Serial.println("Correct time read");
+        #endif
       }
       else{
         #ifdef DEBUG
-        Serial.println("err hour read");
+        Serial.println("err minute read");
         #endif
       }
     }
     else{
       #ifdef DEBUG
-      Serial.println("err mounth read");
+      Serial.println("err hour read");
       #endif
     }
+  }
+  else{
+    #ifdef DEBUG
+    Serial.println("err mounth read");
+    #endif
+  }
   TimeHM = (TimeH * 100) + TimeM;
-
 }
 
 void LedWOn2(){
-  int NumLedWOn2 = map(TimeStamp, StartLedWTimeStamp, (StartLedWTimeStamp+(NumLedW * SpeedLedWTimeStamp)), 0, NumLedW);
+  long NumLedWOn2 = map(TimeStamp, StartLedWTimeStamp, (StartLedWTimeStamp+(NumLedW * SpeedLedWTimeStamp)), 0, NumLedW);
   Serial.println(NumLedWOn2);
+  delay (100);
 }
 
 
@@ -735,7 +697,7 @@ void SerialInfoSetup(){
   #ifdef DEBUG
     Serial.println();
     Serial.println("---------------------SETUP INFO------------------------");
-    Serial.println("Version: " + String(SetRtcY) + String(SetRtcMo) + String(SetRtcD));
+    Serial.println("Version: " + String(__DATE__));
     Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
     Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
     //Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
@@ -1016,7 +978,7 @@ void OledTimePage(){
   OledLeftText(0);
   Oled.print("Time: "); Oled.print(TimeH);  Oled.print(":");  Oled.print(TimeM);  Oled.print(":");  Oled.print(TimeS); 
   OledLeftText(1); 
-  Oled.print("Stamp: 86400"); //Oled.print(TimeStamp); 
+  Oled.print("Stamp: "); Oled.print(TimeStamp); 
   OledLeftText(2);
   Oled.print("Run: "); Oled.print((millis()/1000)); Oled.print("s");
   OledLeftText(3);
