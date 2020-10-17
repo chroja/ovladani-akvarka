@@ -6,17 +6,10 @@ RTClib                                        https://navody.arduino-shop.cz/doc
 DS18B20                                       https://navody.arduino-shop.cz/docs/texty/0/14/dallastemperature.zip
 OneWire                                       https://navody.arduino-shop.cz/docs/texty/0/15/onewire.zip
 
-
-#
-sensor adress 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 vnejsi dlouhy kabel
-              0x28, 0xFF, 0x1A, 0x62, 0xC0, 0x17, 0x05, 0xF0 vnejsi kratky kabel
-              0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10 v akva
-Set
-
 pumpa 520ms/ml
 
-COM6 - meduino
-com10 - mega akvarko
+COM13 - meduino
+com12 - mega akvarko
 
 
               TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
@@ -69,31 +62,19 @@ com10 - mega akvarko
 #define SEARCH_ADDRESS_DS18B20
 #define RESTART
 #define SERIAL_INFO
-#define DRY_RUN
-#define CUSTOM_BOARD
+//#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 
 bool SET_RTC = false;
 
-
 //water sensor
-#ifdef DRY_RUN
-  //uint8_t T0SensorAddress[8] = { 0x28, 0x25, 0xC5, 0xF7, 0x08, 0x00, 0x00, 0x61 }; //water sensor used on desk - 2wire! red - sign, white - gnd, 4K7 sign -vcc
+#ifdef CUSTOM_BOARD
   uint8_t T0SensorAddress[8] = { 0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0 }; //water sensor used on desk
-#else
- // uint8_t T0SensorAddress[8] = { 0x28, 0xDA, 0xDD, 0xC0, 0x1E, 0x19, 0x01, 0x20 }; //water sensor used in aquarium
- 
-  uint8_t T0SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //water sensor used in aquarium
-#endif
-
-//led sensor
-#ifdef DRY_RUN
-  //uint8_t T1SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //led sensor used on desk
   uint8_t T1SensorAddress[8] = { 0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59 }; //led sensor used on desk
 #else
   uint8_t T1SensorAddress[8] = { 0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F }; //water sensor used in aquarium
+  uint8_t T0SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //water sensor used in aquarium
 #endif
-
 
 
 U8GLIB_SH1106_128X64 Oled(0x3c);
@@ -458,6 +439,7 @@ void GetTime(){
         TimeS = NTimeS;
         TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
         #ifdef DEBUG
+        //
         Serial.println(TimeStamp);
         Serial.println("Correct time read");
         #endif
