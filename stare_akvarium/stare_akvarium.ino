@@ -62,10 +62,11 @@ com12 - mega akvarko
 #define SEARCH_ADDRESS_DS18B20
 #define RESTART
 #define SERIAL_INFO
-//#define CUSTOM_BOARD
+#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 
 bool SET_RTC = false;
+bool MESAURE_LED_TEMP = true;
 
 //water sensor
 #ifdef CUSTOM_BOARD
