@@ -62,7 +62,7 @@ com12 - mega akvarko
 #define SEARCH_ADDRESS_DS18B20
 #define RESTART
 #define SERIAL_INFO
-#define CUSTOM_BOARD
+//#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 
 bool SET_RTC = false;
@@ -81,12 +81,20 @@ bool MESAURE_LED_TEMP = true;
 U8GLIB_SH1106_128X64 Oled(0x3c);
 
 //variales led pin (W D22-D27)
+/*
 #define LedW1 22
 #define LedW2 23
 #define LedW3 24
 #define LedW4 25
 #define LedW5 26
 #define LedW6 27
+*/
+#define LedW1 10
+#define LedW2 10
+#define LedW3 10
+#define LedW4 10
+#define LedW5 10
+#define LedW6 10
 
 #define LightBtnPin 2
 
@@ -578,7 +586,7 @@ void LedWSwitch() {
       #ifdef DEBUG
       Serial.println("All white LED strip are off.");
       #endif
-      break;
+      break;/*
     case 1:
       digitalWrite(LedW1, HIGH);
       digitalWrite(LedW2, LOW);
@@ -645,7 +653,7 @@ void LedWSwitch() {
       #ifdef DEBUG
       Serial.println("1-5 white LED strip are on");
       #endif
-      break;
+      break;*/
     case 6:
       digitalWrite(LedW1, HIGH);
       digitalWrite(LedW2, HIGH);
