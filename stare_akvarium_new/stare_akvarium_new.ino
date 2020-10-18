@@ -12,36 +12,6 @@ COM13 - meduino
 com12 - mega akvarko
 
 
-              TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
-
-              const int pocetCyklu = 2;
-              int pocetPasku = 6;
-              int NumLedWOn;
-
-              unsigned long Timestamp;
-
-              byte StartLedHourW[pocetCyklu] = {16, 4}; // rozsviti se prni LED, postupne se budou zapinat dalsi
-              byte StartLedMinuteW[pocetCyklu] = {00, 30};
-              unsigned long StartLedWTimeStamp[pocetCyklu];
-              unsigned long EndLedWTimeStamp[pocetCyklu];
-              unsigned long casPosledniho[pocetCyklu];
-
-              void setup() {
-                // put your setup code here, to run once:
-                for (int i = 0; i < pocetCyklu; i++) {
-                  StartLedWTimeStamp[i] = ((StartLedHourW[i] * 3600) + (StartLedMinuteW[i] * 60));
-                }
-              }
-
-              void loop() {
-
-                for (int i = 0; i < pocetCyklu; i++) {
-                  if (( Timestamp > StartLedWTimeStamp[i]) && ( Timestamp < EndLedWTimeStamp[i])) {
-                    casPosledniho[i] = StartLedWTimeStamp[i] + 5*60;
-                    NumLedWOn = map (Timestamp, StartLedWTimeStamp[i], casPosledniho[i], 0, pocetPasku);
-                  }
-                }
-              }
 
 */
 
@@ -76,6 +46,22 @@ bool MESAURE_LED_TEMP = true;
   uint8_t T1SensorAddress[8] = { 0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F }; //water sensor used in aquarium
   uint8_t T0SensorAddress[8] = { 0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10 }; //water sensor used in aquarium
 #endif
+
+long LightCurve [12][5] = {
+    // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0%-100%
+    {0, 0, 0, 0, 0}, //00:00
+    {25200, 0, 0, 0, 0}, //7:00
+    {28800, 80, 60, 15, 30}, //8:00
+    {30600, 100, 100, 50, 100}, //8:30
+    {43200, 100, 100, 50, 100}, //12:00
+    {44100, 30, 30, 30, 30}, //12:15
+    {53100, 30, 30, 30, 30}, //14:45
+    {54000, 100, 100, 50, 100}, //15:00
+    {70200, 100, 100, 50, 100}, //19:30
+    {72000, 100, 50, 20, 30}, //20:00
+    {77400, 0, 0, 0, 0}, //21:30
+    {86399, 0, 0, 0, 0}, //23:59:59
+};
 
 
 U8GLIB_SH1106_128X64 Oled(0x3c);
