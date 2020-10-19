@@ -33,7 +33,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #define TEMP_OFFSET
 #define RESTART
 #define SERIAL_INFO
-#define CUSTOM_BOARD
+//#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 
 bool SET_RTC = false;
@@ -48,7 +48,7 @@ bool SEARCH_ADDRESS_DS18B20 = true;
     uint8_t T0SensorAddress[8] = {0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10}; //water sensor used in aquarium
 #endif
 
-const uint8_t PROGMEM gamma[] = {
+int gamma[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
@@ -68,19 +68,19 @@ const uint8_t PROGMEM gamma[] = {
 };
 
 long LightCurve[][5] = {
-    // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0%-100%
-    {0, 0, 0, 0, 0},            //00:00
-    {25200, 0, 0, 0, 0},        //7:00
-    {28800, 80, 60, 15, 30},    //8:00
-    {30600, 100, 100, 50, 100}, //8:30
-    {43200, 100, 100, 50, 100}, //12:00
-    {44100, 30, 30, 30, 30},    //12:15
-    {53100, 30, 30, 30, 30},    //14:45
-    {54000, 100, 100, 50, 100}, //15:00
-    {70200, 100, 100, 50, 100}, //19:30
-    {72000, 100, 50, 20, 30},   //20:00
-    {77400, 0, 0, 0, 0},        //21:30
-    {86399, 0, 0, 0, 0},        //23:59:59
+    // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
+    {0, 0, 0, 0, 0},                //00:00
+    {25200, 0, 0, 0, 0},            //7:00
+    {28800, 800, 600, 150, 300},    //8:00
+    {30600, 1000, 1000, 500, 1000}, //8:30
+    {43200, 1000, 1000, 500, 1000}, //12:00
+    {44100, 300, 300, 300, 300},    //12:15
+    {53100, 300, 300, 300, 300},    //14:45
+    {54000, 1000, 1000, 500, 1000}, //15:00
+    {70200, 1000, 1000, 500, 1000}, //19:30
+    {72000, 1000, 500, 200, 300},   //20:00 
+    {77400, 0, 0, 0, 0},            //21:30 
+    {86399, 0, 0, 0, 0},            //23:59:59
 };
 
 int NumRows;
@@ -126,18 +126,27 @@ rele_t Relay4;
 #define RGBLightNum 4
 #define RGBDataPin 2
 #define RGBClockPin 3
-byte RedMax = 255;
-byte GreenMax = 255;
-byte BlueMax = 255;
-byte WhiteMax = 255;
-byte RedCurr = 0;
-byte RedPrev = 0;
-byte GreenCurr = 0;
-byte GreenPrev = 0;
-byte BlueCurr = 0;
-byte BluePrev = 0;
-byte WhiteCurr = 0; 
-byte WhitePrev = 0;
+
+int RedCurr = 0;       //0-100
+int RedPrev = 0;       //0-100
+int RedPwm = 0;        //0-255
+int RedPwmMax = 255;   //0-255
+
+int GreenCurr = 0;
+int GreenPrev = 0;
+int GreenPwm = 0;
+int GreenPwmMax = 255;
+
+int BlueCurr = 0;
+int BluePrev = 0;
+int BluePwm = 0;
+int BluePwmMax = 255;
+
+int WhiteCurr = 0; 
+int WhitePrev = 0;
+int WhitePwm = 0;
+int WhitePwmMax = 255;
+
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
 byte PrevModeLight = 0;
@@ -274,7 +283,8 @@ void setup(){
     }
     FastLED.show();
 
-    initPin(LightWPin);
+    pinMode(LightWPin, OUTPUT);
+    digitalWrite(LightWPin, 0);
     pinMode(LightBtnPin, INPUT);
     LightBtnState = digitalRead(LightBtnPin);
 
@@ -397,8 +407,6 @@ void SerialInfoSetup(){
         Serial.println("---------------------SETUP INFO------------------------");
         Serial.println("Version: " + String(__DATE__));
         Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
-        // Serial.println("White led start time (HH:MM): " + String(StartLedHourW) + ":" + String(StartLedMinuteW) + " White led end time (HH:MM): " + String(EndLedHourW) + ":" + String(EndLedMinuteW) + " Offset for each strip (in minutes): " + String(SpeedLedW) + " Maximum white led strip (num): " + String(NumLedW));
-        //Serial.println("Red value: " + String(RLedValue) + " Green value: " + String(GLedValue) + " Blue value: " + String(BLedValue));
         Serial.println("---------------------END SETUP INFO------------------------");
     #endif
 }
@@ -414,7 +422,9 @@ void SerialInfo(){
             Serial.println("Heater  status: " + String(HeaterState));
             Serial.println("T0 Temp (water): " + String(T0Temp));
             Serial.println("T1 Temp (LED): " + String(T1Temp));
-
+            Serial.println("Time Stamp (sec): " + String(TimeStamp));
+            Serial.print("index current row: ");    Serial.print(CurrentRow);
+            Serial.print(" index target row: ");    Serial.println(TargetRow);
             DEBUG_TimeS = TimeS;
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
@@ -622,9 +632,11 @@ void OledDrawPages(){
         OledTempPage();
         break;
     case 2:
-        OledLedModePage();
+        OledLightModePage();
         break;
-
+    case 3:
+        OledLightColorPage();
+        break;
     default:
         CurrentPage = 0;
         Serial.println("Maximum count for pages overflow. Now set current page to 0.");
@@ -708,7 +720,7 @@ void OledTempPage(){
     }
 }
 
-void OledLedModePage(){
+void OledLightModePage(){
     OledLeftText(0);
     Oled.print("Led mode: ");
     if (ModeLight == 0){
@@ -723,26 +735,20 @@ void OledLedModePage(){
     else{
         Oled.print("ERR");
     }
+}
+
+void OledLightColorPage(){
+    OledLeftText(0);
+    Oled.print("RED: ");    Oled.print(float(RedCurr)/10);    Oled.print("%");
 
     OledLeftText(1);
-    Oled.print("RED: ");
-    Oled.print(RedCurr);
-    Oled.print("%");
+    Oled.print("GREEN: ");  Oled.print(float(GreenCurr)/10);  Oled.print("%");
 
     OledLeftText(2);
-    Oled.print("GREEN: ");
-    Oled.print(GreenCurr);
-    Oled.print("%");
-
-    OledLeftText(3);
-    Oled.print("BLUE: ");
-    Oled.print(BlueCurr);
-    Oled.print("%");
+    Oled.print("BLUE: ");   Oled.print(float(BlueCurr)/10);   Oled.print("%");
     
-    OledLeftText(4);
-    Oled.print("White: ");
-    Oled.print(WhiteCurr);
-    Oled.print("%");
+    OledLeftText(3);
+    Oled.print("White: ");  Oled.print(float(WhiteCurr)/10);  Oled.print("%");
 }
 
 
@@ -801,32 +807,57 @@ void PrepareShowLight (){
     if(!LightAuto){
         return;
     }
-    RedPrev = RedCurr;
-    GreenPrev = GreenCurr;
-    BluePrev = BlueCurr;
-    WhitePrev = WhiteCurr;
     NumRows = sizeof(LightCurve)/sizeof(LightCurve[0]);
     IndexRow = NumRows - 1;
     for(int i = 0; i < IndexRow; i++){
         if(TimeStamp >= LightCurve[i][0]){
-            TargetRow = i;
-            CurrentRow = TargetRow - 1;
+            CurrentRow = i;
+            TargetRow = CurrentRow + 1;
+            
         }
     }
-    Serial.print("index target row: ");         Serial.print(TargetRow);
-    Serial.print(" index current row: ");        Serial.println(CurrentRow);
 
+    RedCurr = map(TimeStamp, LightCurve[CurrentRow][0], LightCurve[TargetRow][0], LightCurve[CurrentRow][1], LightCurve[TargetRow][1]);
+    RedPwm = map(RedCurr, 0, 1000, 0, RedPwmMax);
 
+    GreenCurr = map(TimeStamp, LightCurve[CurrentRow][0], LightCurve[TargetRow][0], LightCurve[CurrentRow][2], LightCurve[TargetRow][2]);
+    GreenPwm = map(GreenCurr, 0, 1000, 0, GreenPwmMax);
+
+    BlueCurr = map(TimeStamp, LightCurve[CurrentRow][0], LightCurve[TargetRow][0], LightCurve[CurrentRow][3], LightCurve[TargetRow][3]);
+    BluePwm = map(BlueCurr, 0, 1000, 0, BluePwmMax);
+
+    WhiteCurr = map(TimeStamp, LightCurve[CurrentRow][0], LightCurve[TargetRow][0], LightCurve[CurrentRow][4], LightCurve[TargetRow][4]);
+    WhitePwm = map(WhiteCurr, 0, 1000, 0, WhitePwmMax);
 
     if((RedPrev != RedCurr) || (GreenPrev != GreenCurr) || (BluePrev != BlueCurr) || (WhitePrev != WhiteCurr)){
+        
         ShowLight();
+        Serial.print("\n********** Color Changed **********");
+        Serial.print("\nRed   from: ");     Serial.print(float(RedPrev)/10);       Serial.print(" % \tto: ");   Serial.print(float(RedCurr)/10);      Serial.print(" % \tPWM: ");  Serial.print(RedPwm);
+        Serial.print("\nGreen from: ");     Serial.print(float(GreenPrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(GreenCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(GreenPwm);
+        Serial.print("\nBlue  from: ");     Serial.print(float(BluePrev)/10);      Serial.print(" % \tto: ");   Serial.print(float(BlueCurr)/10);     Serial.print(" % \tPWM: ");  Serial.print(BluePwm);
+        Serial.print("\nWhite from: ");     Serial.print(float(WhitePrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(WhiteCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(WhitePwm);
+        Serial.print("\n********** Color Changed **********");
+        RedPrev = RedCurr;
+        GreenPrev = GreenCurr;
+        BluePrev = BlueCurr;
+        WhitePrev = WhiteCurr;
     }
 }
 
 
 void ShowLight(){
+    
     for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(RedCurr, GreenCurr, BlueCurr);
+        RBGLights[i] = CRGB(gamma[RedPwm], gamma[GreenPwm], gamma[BluePwm]);
     }
-    digitalWrite(LightWPin, WhiteCurr);
+    FastLED.show();
+    analogWrite(LightWPin, gamma[WhitePwm]);
+    /*
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(RedPwm, GreenPwm, BluePwm);
+    }
+    FastLED.show();
+    analogWrite(LightWPin, WhitePwm);
+    */
 }
