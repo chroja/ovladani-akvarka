@@ -11,6 +11,9 @@ pumpa 520ms/ml
 COM13 - meduino
 com12 - mega akvarko
 
+int numRows = sizeof(LightCurve)/sizeof(LightCurve[0]);
+int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
+
 
 
 */
@@ -35,17 +38,36 @@ com12 - mega akvarko
 
 bool SET_RTC = false;
 bool MESAURE_LIGHT_TEMP = true;
-bool SEARCH_ADDRESS_DS18B20 = true
+bool SEARCH_ADDRESS_DS18B20 = true;
 //water sensor
 #ifdef CUSTOM_BOARD
-uint8_t T0SensorAddress[8] = {0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0}; //water sensor used on desk
-uint8_t T1SensorAddress[8] = {0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59}; //led sensor used on desk
+    uint8_t T0SensorAddress[8] = {0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0}; //water sensor used on desk
+    uint8_t T1SensorAddress[8] = {0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59}; //led sensor used on desk
 #else
-uint8_t T1SensorAddress[8] = {0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F}; //water sensor used in aquarium
-uint8_t T0SensorAddress[8] = {0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10}; //water sensor used in aquarium
+    uint8_t T1SensorAddress[8] = {0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F}; //water sensor used in aquarium
+    uint8_t T0SensorAddress[8] = {0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10}; //water sensor used in aquarium
 #endif
 
-long LightCurve[12][5] = {
+const uint8_t PROGMEM gamma[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+    2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5,
+    5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10,
+    10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 15, 15, 16, 16,
+    17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 24, 24, 25,
+    25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 35, 35, 36,
+    37, 38, 39, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 50,
+    51, 52, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
+    69, 70, 72, 73, 74, 75, 77, 78, 79, 81, 82, 83, 85, 86, 87, 89,
+    90, 92, 93, 95, 96, 98, 99, 101, 102, 104, 105, 107, 109, 110, 112, 114,
+    115, 117, 119, 120, 122, 124, 126, 127, 129, 131, 133, 135, 137, 138, 140, 142,
+    144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 167, 169, 171, 173, 175,
+    177, 180, 182, 184, 186, 189, 191, 193, 196, 198, 200, 203, 205, 208, 210, 213,
+    215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255
+};
+
+long LightCurve[][5] = {
     // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0%-100%
     {0, 0, 0, 0, 0},            //00:00
     {25200, 0, 0, 0, 0},        //7:00
@@ -60,6 +82,11 @@ long LightCurve[12][5] = {
     {77400, 0, 0, 0, 0},        //21:30
     {86399, 0, 0, 0, 0},        //23:59:59
 };
+
+int NumRows;
+int IndexRow;
+int CurrentRow;
+int TargetRow;
 
 U8GLIB_SH1106_128X64 Oled(0x3c);
 
@@ -103,7 +130,14 @@ byte RedMax = 255;
 byte GreenMax = 255;
 byte BlueMax = 255;
 byte WhiteMax = 255;
-byte RedCur, RedPrev, GreenCurr, GreenPrev, BlueCurr, BluePrev, WhiteCurr, WhitePrev;
+byte RedCurr = 0;
+byte RedPrev = 0;
+byte GreenCurr = 0;
+byte GreenPrev = 0;
+byte BlueCurr = 0;
+byte BluePrev = 0;
+byte WhiteCurr = 0; 
+byte WhitePrev = 0;
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
 byte PrevModeLight = 0;
@@ -119,8 +153,7 @@ int TimeD = 0;
 int TimeH = 0;
 int TimeM = 0;
 int TimeS = 0;
-int TimeHM = 0;
-
+/*
 int NTimeY = 0;
 int NTimeMo = 0;
 int NTimeDay = 0;
@@ -128,8 +161,7 @@ int NTimeD = 0;
 int NTimeH = 0;
 int NTimeM = 0;
 int NTimeS = 0;
-int NTimeHM = 0;
-
+*/
 unsigned long RtcCurrentMillis = 0;
 unsigned long TimeStamp = 0;
 
@@ -147,13 +179,11 @@ float T0Offset = 0;
 float T1Offset = 0;
 #endif
 
-unsigned long NextReadTepmMs = 0;
-int NextReadTepmMin = 0;
-int LastReadTemp;
+long NextReadTemp = 0;
 int ErrorTempMax = 10;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
-int TempReadPeriod = 15000; //15 sec
+int TempReadPeriod = 15; //15 sec
 //heat
 float TargetTemp = 25;
 float DeltaT = 0.5;
@@ -277,7 +307,6 @@ void setup(){
     GetTimeSetup();
     DiscoverOneWireDevices();
     SensorsDS.begin();
-    NextReadTepmMin = TimeM;
     SerialInfoSetup();
     delay(500);
     Serial.println("------End setup-----");
@@ -296,17 +325,17 @@ void loop(){
     }
 
     LightBtnRead();
-    Led();
+    PrepareShowLight();
 
-    #ifdef SERIAL_INFO
-        SerialInfo();
-    #endif
+
     GetTemp();
     Heat();
     FirstRun = false;
     TimeRestart();
-    CheckLightTemp();
     ShowOled();
+    #ifdef SERIAL_INFO
+        SerialInfo();
+    #endif
 }
 
 //****************************************** FUNCTION ****************************************
@@ -332,257 +361,36 @@ void GetTimeSetup(){
     TimeH = DateTime.hour;
     TimeM = DateTime.minute;
     TimeS = DateTime.second;
-    TimeHM = (TimeH * 100) + TimeM;
 }
 
 void GetTime(){
     DateTime = rtc.getDateTime();
-    NTimeY = DateTime.year;
-    NTimeMo = DateTime.month;
-    NTimeDay = DateTime.day;
-    NTimeH = DateTime.hour;
-    NTimeM = DateTime.minute;
-    NTimeS = DateTime.second;
-    if ((NTimeMo > 0) && (NTimeMo < 13)){
-        if ((NTimeH >= 0) && (NTimeH < 24)){
-            if ((NTimeM >= 0) && (NTimeM < 60)){
-                TimeY = NTimeY;
-                TimeMo = NTimeMo;
-                TimeDay = NTimeDay;
-                TimeH = NTimeH;
-                TimeM = NTimeM;
-                TimeS = NTimeS;
-                TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
-                #ifdef DEBUG
-                    Serial.println(TimeStamp);
-                    Serial.println("Correct time read");
-                #endif
-            }
-            else{
-                #ifdef DEBUG
-                    Serial.println("err minute read");
-                #endif
-            }
-        }
-        else{
-            #ifdef DEBUG
-                Serial.println("err hour read");
-            #endif
-        }
+    int NTimeY = DateTime.year;
+    byte NTimeMo = DateTime.month;
+    byte NTimeDay = DateTime.day;
+    byte NTimeH = DateTime.hour;
+    byte NTimeM = DateTime.minute;
+    byte NTimeS = DateTime.second;
+    if (((NTimeMo > 0) && (NTimeMo < 13)) && ((NTimeH >= 0) && (NTimeH < 24)) && ((NTimeM >= 0) && (NTimeM < 60))){
+        TimeY = NTimeY;
+        TimeMo = NTimeMo;
+        TimeDay = NTimeDay;
+        TimeH = NTimeH;
+        TimeM = NTimeM;
+        TimeS = NTimeS;
+        TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
+        #ifdef DEBUG
+            Serial.println("Correct time read");
+        #endif
     }
     else{
         #ifdef DEBUG
-            Serial.println("err mounth read");
+            Serial.println("err time read");
         #endif
     }
-    TimeHM = (TimeH * 100) + TimeM;
 }
 
-/*
-void LedWOn(){
-  int LedWOffset;
-  int LedWOffsetMinute;
-  int LedWOffseHour;
-  int LedWoffsetTime;
-  if((NumLedWOn <= NumLedW) && (StatusLedStrip != 1)){
-    LedWOffset = ((NumLedWOn) * SpeedLedW);
-    LedWOffsetMinute =  (StartLedMinuteW + LedWOffset) % 60;
-    LedWOffseHour  = ((StartLedMinuteW + LedWOffset) / 60) + StartLedHourW;
-    LedWoffsetTime = (LedWOffseHour * 100) + LedWOffsetMinute;
 
-    #ifdef DEBUG
-    if(OldNumLedWOffset != NumLedWOn){
-      Serial.print("Next strip in time: ");
-      Serial.println(LedWoffsetTime);
-      OldNumLedWOffset = NumLedWOn;
-    }
-    #endif
-  }
-  if((LedWoffsetTime <= TimeHM) && (EndLedW >= TimeHM) && (StatusLedStrip != 1)){
-    if(NumLedWOn < NumLedW){
-      NumLedWOn = NumLedWOn + 1;
-
-      #ifdef DEBUG
-      Serial.print("NumLedWOn: ");
-      Serial.println(NumLedWOn);
-      #endif
-    }
-    else if (NumLedWOn == NumLedW){
-      StatusLedStrip = 1;
-
-
-
-      #ifdef DEBUG
-      Serial.print("Status led strip W change to: ");
-      Serial.println(StatusLedStrip);
-      #endif
-    }
-    else{
-      Serial.println("Error in function LedWOn. Loop is broken :(");
-    }
-
-    LedWSwitch();
-  }
-}
-
-void LedWOff(){
-  int LedWOffset;
-  int LedWOffsetMinute;
-  int LedWOffseHour;
-  int LedWoffsetTime;
-  if((NumLedWOn > 0) && (StatusLedStrip != 0)){
-    LedWOffset = ((NumLedW - NumLedWOn) * SpeedLedW);
-    LedWOffsetMinute =  (EndLedMinuteW + LedWOffset) % 60;
-    LedWOffseHour  = ((EndLedMinuteW + LedWOffset) / 60) + EndLedHourW;
-    LedWoffsetTime = (LedWOffseHour * 100) + LedWOffsetMinute;
-
-    #ifdef DEBUG
-    if(OldNumLedWOffset != NumLedWOn){
-      Serial.print("Next strip in time: ");
-      Serial.println(LedWoffsetTime);
-      OldNumLedWOffset = NumLedWOn;
-    }
-    #endif
-  }
-  if((LedWoffsetTime <= TimeHM) && (StatusLedStrip != 0)){
-    if(NumLedWOn > 0){
-      NumLedWOn = NumLedWOn - 1;
-
-      #ifdef DEBUG
-      Serial.print("NumLedWOn: ");
-      Serial.println(NumLedWOn);
-      #endif
-    }
-    else if (NumLedWOn == 0){
-      StatusLedStrip = 0;
-
-      #ifdef DEBUG
-      Serial.print("Status led strip W change to: ");
-      Serial.println(StatusLedStrip);
-      #endif
-    }
-    else{
-      Serial.println("Error in function LedWOff. Loop is broken :(");
-    }
-
-    LedWSwitch();
-  }
-}
-
-void LedWSwitch() {
-  switch(NumLedWOn){
-    case 0:
-      digitalWrite(LedW1, LOW);
-      digitalWrite(LedW2, LOW);
-      digitalWrite(LedW3, LOW);
-      digitalWrite(LedW4, LOW);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      for (int i = 0; i < RGBLedNum; i++) { //RGBLedNum
-        RBGLeds[i] = CRGB(0,0,0);
-      }
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("All white LED strip are off.");
-      #endif
-      break;
-    case 1:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, LOW);
-      digitalWrite(LedW3, LOW);
-      digitalWrite(LedW4, LOW);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      for (int i = 0; i < 2; i++) { //RGBLedNum
-        RBGLeds[i] = CRGB(Red,0,0);
-      }
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("1 white LED strip is on");
-      #endif
-      break;
-    case 2:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, HIGH);
-      digitalWrite(LedW3, LOW);
-      digitalWrite(LedW4, LOW);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      RBGLeds[2] = CRGB(Red,0,0);
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("1-2 white LED strip are on");
-      #endif
-      break;
-    case 3:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, HIGH);
-      digitalWrite(LedW3, HIGH);
-      digitalWrite(LedW4, LOW);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      RBGLeds[3] = CRGB(Red,0,0);
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("1-3 white LED strip are on");
-      #endif
-      break;
-    case 4:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, HIGH);
-      digitalWrite(LedW3, HIGH);
-      digitalWrite(LedW4, HIGH);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      #ifdef DEBUG
-      Serial.println("1-4 white LED strip are on");
-      #endif
-      break;
-    case 5:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, HIGH);
-      digitalWrite(LedW3, HIGH);
-      digitalWrite(LedW4, HIGH);
-      digitalWrite(LedW5, HIGH);
-      digitalWrite(LedW6, LOW);
-      for (int i = 0; i < RGBLedNum; i++) {
-        RBGLeds[i] = CRGB(Red,0,0);
-      }
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("1-5 white LED strip are on");
-      #endif
-      break;
-    case 6:
-      digitalWrite(LedW1, HIGH);
-      digitalWrite(LedW2, HIGH);
-      digitalWrite(LedW3, HIGH);
-      digitalWrite(LedW4, HIGH);
-      digitalWrite(LedW5, HIGH);
-      digitalWrite(LedW6, HIGH);
-      for (int i = 0; i < RGBLedNum; i++) {
-        RBGLeds[i] = CRGB(Red,Green,Blue);
-      }
-      FastLED.show();
-      #ifdef DEBUG
-      Serial.println("1-6 white LED strip are on");
-      #endif
-      break;
-    default:
-      digitalWrite(LedW1, LOW);
-      digitalWrite(LedW2, LOW);
-      digitalWrite(LedW3, LOW);
-      digitalWrite(LedW4, LOW);
-      digitalWrite(LedW5, LOW);
-      digitalWrite(LedW6, LOW);
-      #ifdef DEBUG
-      Serial.println("All white LED strip are off. Case default!!");
-      #endif
-      break;
-  }
-}
-
-*/
 void SerialInfoSetup(){
     #ifdef DEBUG
         Serial.println();
@@ -602,7 +410,6 @@ void SerialInfo(){
             Serial.println("------------------------------------------------------------");
             Serial.println("-------------------Start serial info------------------------");
             Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
-            //Serial.println("Numbers LED stip white on: " + String(NumLedWOn));
             Serial.println("Heat cable status: " + String(CableHeatState));
             Serial.println("Heater  status: " + String(HeaterState));
             Serial.println("T0 Temp (water): " + String(T0Temp));
@@ -642,8 +449,8 @@ void TimeRestart(){
 }
 
 void GetTemp(){
-    if (NextReadTepmMs <= millis()){
-        LedWSwitch(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
+    if (NextReadTemp >= TimeStamp){
+        ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
         #ifdef DEBUG
             Serial.println("******** Start measure temp *******\n");
         #endif
@@ -654,15 +461,12 @@ void GetTemp(){
         #else
             T1TempNoOffset = T0TempNoOffset;
         #endif
-
-        NextReadTepmMs = NextReadTepmMs + TempReadPeriod;
-        LastReadTemp = TimeHM;
-        #ifdef DEBUG
+        NextReadTemp = NextReadTemp + TempReadPeriod;
+                #ifdef DEBUG
             Serial.println("Temp read.");
             Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
             Serial.println("Temp read.");
             Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "°C");
-            Serial.println("Current measure in time: " + String(LastReadTemp));
         #endif
         if ((T0TempNoOffset > -127) && (T0TempNoOffset < 85)){
             if ((T1TempNoOffset > -127) && (T1TempNoOffset < 85)){
@@ -907,13 +711,13 @@ void OledTempPage(){
 void OledLedModePage(){
     OledLeftText(0);
     Oled.print("Led mode: ");
-    if (ModeLed == 0){
+    if (ModeLight == 0){
         Oled.print("Off");
     }
-    else if (ModeLed == 1){
+    else if (ModeLight == 1){
         Oled.print("Auto");
     }
-    else if (ModeLed == 2){
+    else if (ModeLight == 2){
         Oled.print("On");
     }
     else{
@@ -921,47 +725,40 @@ void OledLedModePage(){
     }
 
     OledLeftText(1);
-    Oled.print("Led Case:");
-    Oled.print(NumLedWOn);
+    Oled.print("RED: ");
+    Oled.print(RedCurr);
+    Oled.print("%");
+
+    OledLeftText(2);
+    Oled.print("GREEN: ");
+    Oled.print(GreenCurr);
+    Oled.print("%");
+
+    OledLeftText(3);
+    Oled.print("BLUE: ");
+    Oled.print(BlueCurr);
+    Oled.print("%");
+    
+    OledLeftText(4);
+    Oled.print("White: ");
+    Oled.print(WhiteCurr);
+    Oled.print("%");
 }
 
-void CheckLedTemp(){
-  if(StatusLedStrip == 1){
-    if (T1Temp > MaximumLedTemp){
-      PrevLedWOn = NumLedWOn;
-      NumLedWOn = 0;
-      if (NumLedWOn != PrevLedWOn){
-        Serial.println("\n\n********** Temperature led light exceed maximum operating temperature **********\n");
-        LedWSwitch();
-      }
-    }
-    if (T1Temp > SafeLedTemp){
-      PrevLedWOn = NumLedWOn;
-      NumLedWOn = map(T1Temp, SafeLedTemp, MaximumLedTemp, NumLedW-1, 0);
-      if (NumLedWOn != PrevLedWOn){
-        Serial.println("\n\n***** Temperature led light exceed safety operating temperature *****\n");
-        Serial.print("Now lighting: " + String(NumLedWOn) + " white led strip(s)\n");
-        LedWSwitch();
-      }
-    }
-  }
-}
 
 void LightMode(){
     if (ModeLight == 0){
         if (PrevModeLight != 0){
             PrevModeLight = ModeLight;
             Serial.println("Light set to off mode.");
-            NumLedWOn = 0;
-            LedWSwitch();
+            //napsat natvrdo z proměné
         }
     }
     else if (ModeLight == 2){
         if (PrevModeLight != 2){
             PrevModeLight = ModeLight;
             Serial.println("Light set to on mode.");
-            NumLedWOn = 6;
-            LedWSwitch();
+            //napsat natvrdo z proměné
         }
     }
     else if (ModeLight == 1){
@@ -981,11 +778,11 @@ void LightBtnRead (){
     if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
         delay(20);
         if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
-            ModeLed = ModeLed + LightBtnDir;
+            ModeLight = ModeLight + LightBtnDir;
             LightBtnState = digitalRead(LightBtnPin);
             Serial.println(digitalRead(LightBtnPin));
-            Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLed));
-            if((ModeLed == 0) || (ModeLed == 2)){
+            Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
+            if((ModeLight == 0) || (ModeLight == 2)){
                 LightBtnDir = LightBtnDir * (-1);
                     if(LightBtnDir > 0){
                         Serial.println("func LightBtnRead -- next LightBtnDir: +");
@@ -1000,10 +797,36 @@ void LightBtnRead (){
     PrevLightBtnState = LightBtnState;
 }
 
-void ShowLight{
+void PrepareShowLight (){
     if(!LightAuto){
         return;
     }
-   /* code*/
-   
+    RedPrev = RedCurr;
+    GreenPrev = GreenCurr;
+    BluePrev = BlueCurr;
+    WhitePrev = WhiteCurr;
+    NumRows = sizeof(LightCurve)/sizeof(LightCurve[0]);
+    IndexRow = NumRows - 1;
+    for(int i = 0; i < IndexRow; i++){
+        if(TimeStamp >= LightCurve[i][0]){
+            TargetRow = i;
+            CurrentRow = TargetRow - 1;
+        }
+    }
+    Serial.print("index target row: ");         Serial.print(TargetRow);
+    Serial.print(" index current row: ");        Serial.println(CurrentRow);
+
+
+
+    if((RedPrev != RedCurr) || (GreenPrev != GreenCurr) || (BluePrev != BlueCurr) || (WhitePrev != WhiteCurr)){
+        ShowLight();
+    }
+}
+
+
+void ShowLight(){
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(RedCurr, GreenCurr, BlueCurr);
+    }
+    digitalWrite(LightWPin, WhiteCurr);
 }
