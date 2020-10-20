@@ -81,14 +81,14 @@ bool MESAURE_LED_TEMP = true;
 U8GLIB_SH1106_128X64 Oled(0x3c);
 
 //variales led pin (W D22-D27)
-
+/*
 #define LedW1 22
 #define LedW2 23
 #define LedW3 24
 #define LedW4 25
 #define LedW5 26
 #define LedW6 27
-
+*/
 #define LedW1 10
 #define LedW2 10
 #define LedW3 10
@@ -172,8 +172,8 @@ byte StartLedHourW = 16; // rozsviti se prni LED, postupne se budou zapinat dals
 byte StartLedMinuteW = 00;
 unsigned long StartLedWTimeStamp = ((long(StartLedHourW) * 3600) + (long(StartLedMinuteW) * 60));
 int StartLedW = (StartLedHourW * 100) + StartLedMinuteW;
-int EndLedHourW = 19;
-int EndLedMinuteW = 45; //zhasne poslední LED, postupnw zhasnou vsechny
+int EndLedHourW = 21;
+int EndLedMinuteW = 00; //zhasne poslední LED, postupnw zhasnou vsechny
 unsigned long EndLedWTimeStamp = ((long(EndLedHourW) * 3600) + (long(EndLedMinuteW) * 60));
 int EndLedW = (EndLedHourW * 100) + EndLedMinuteW;
 int SpeedLedW = 3; //in minutes
@@ -586,7 +586,7 @@ void LedWSwitch() {
       #ifdef DEBUG
       Serial.println("All white LED strip are off.");
       #endif
-      break;
+      break;/*
     case 1:
       digitalWrite(LedW1, HIGH);
       digitalWrite(LedW2, LOW);
@@ -653,7 +653,7 @@ void LedWSwitch() {
       #ifdef DEBUG
       Serial.println("1-5 white LED strip are on");
       #endif
-      break;
+      break;*/
     case 6:
       digitalWrite(LedW1, HIGH);
       digitalWrite(LedW2, HIGH);
