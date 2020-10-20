@@ -108,6 +108,7 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
 
 #define ON HIGH
 #define OFF LOW
+
 typedef struct
 {
     int pin;
@@ -173,6 +174,7 @@ int NTimeS = 0;
 */
 unsigned long RtcCurrentMillis = 0;
 unsigned long TimeStamp = 0;
+unsigned long LenghtDay = 86399;
 
 //temp
 //DS tem sensors
@@ -205,10 +207,10 @@ float MaximumLightTemp = 65; //degrees
 int PrevLightWOn;
 
 //time variable
-int DEBUG_TimeS = 0;
+int DEBUG_TimeStamp = 0;
 bool FirstRun = true;
 unsigned long OledRefresh = 0;
-float OledPageShowTime = 2.5; //sec
+int OledPageShowTime = 3; //sec
 unsigned long OledShowCurrentPage = 0;
 byte CurrentPage, PrevPage = 0;
 
@@ -413,19 +415,23 @@ void SerialInfoSetup(){
 
 void SerialInfo(){
     #ifdef DEBUG
-        if (TimeS != DEBUG_TimeS){
+        if (TimeStamp != DEBUG_TimeStamp){
             Serial.println();
             Serial.println("------------------------------------------------------------");
             Serial.println("-------------------Start serial info------------------------");
-            Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
-            Serial.println("Heat cable status: " + String(CableHeatState));
-            Serial.println("Heater  status: " + String(HeaterState));
-            Serial.println("T0 Temp (water): " + String(T0Temp));
-            Serial.println("T1 Temp (LED): " + String(T1Temp));
-            Serial.println("Time Stamp (sec): " + String(TimeStamp));
-            Serial.print("index current row: ");    Serial.print(CurrentRow);
-            Serial.print(" index target row: ");    Serial.println(TargetRow);
-            DEBUG_TimeS = TimeS;
+            Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
+            Serial.print("\nTime Stamp (sec): " + String(TimeStamp));
+            Serial.print("\nHeat cable status: " + String(CableHeatState));
+            Serial.print("\t\tHeater  status: " + String(HeaterState));
+            Serial.print("\nT0 Temp (water): " + String(T0Temp));
+            Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
+            Serial.print("\nindex current row: ");    Serial.print(CurrentRow);
+            Serial.print("\tindex target row: ");    Serial.print(TargetRow);
+            Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);
+            Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);
+            Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);
+            Serial.print("\t\tWhite: ");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);
+            DEBUG_TimeStamp = TimeStamp;
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
             Serial.println("------------------------------------------------------------");
@@ -471,7 +477,7 @@ void GetTemp(){
         #else
             T1TempNoOffset = T0TempNoOffset;
         #endif
-        NextReadTemp = NextReadTemp + TempReadPeriod;
+        NextReadTemp = TimeStamp + TempReadPeriod;
                 #ifdef DEBUG
             Serial.println("Temp read.");
             Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
@@ -618,10 +624,13 @@ void I2CScanner(){
 }
 
 void OledDrawPages(){
-    if ((millis()) >= (OledShowCurrentPage + (OledPageShowTime * 1000))){
+    if(TimeStamp > LenghtDay){
+        OledShowCurrentPage = 0;
+    }
+    if (TimeStamp >= (OledShowCurrentPage + OledPageShowTime)){
         CurrentPage++;
-        Serial.println("print next page");
-        OledShowCurrentPage = millis();
+        Serial.print("Oled - print next page. Print page no. "); Serial.println(CurrentPage);
+        OledShowCurrentPage = TimeStamp;
     }
 
     switch (CurrentPage){
@@ -639,7 +648,7 @@ void OledDrawPages(){
         break;
     default:
         CurrentPage = 0;
-        Serial.println("Maximum count for pages overflow. Now set current page to 0.");
+        Serial.println("Oled - maximum count for pages overflow. Now set current page to 0.");
         break;
     }
 }
@@ -757,14 +766,22 @@ void LightMode(){
         if (PrevModeLight != 0){
             PrevModeLight = ModeLight;
             Serial.println("Light set to off mode.");
-            //napsat natvrdo z proměné
+            RedPwm = 0;
+            GreenPwm = 0;
+            BluePwm = 0;
+            WhitePwm = 0;
+            ShowLight();
         }
     }
     else if (ModeLight == 2){
         if (PrevModeLight != 2){
             PrevModeLight = ModeLight;
             Serial.println("Light set to on mode.");
-            //napsat natvrdo z proměné
+            RedPwm = RedPwmMax;
+            GreenPwm = GreenPwmMax;
+            BluePwm = BluePwmMax;
+            WhitePwm = WhitePwmMax;
+            ShowLight();
         }
     }
     else if (ModeLight == 1){
@@ -853,6 +870,7 @@ void ShowLight(){
     }
     FastLED.show();
     analogWrite(LightWPin, gamma[WhitePwm]);
+    Serial.print("\nWrite color");
     /*
     for (int i = 0; i < RGBLightNum; i++) {
         RBGLights[i] = CRGB(RedPwm, GreenPwm, BluePwm);
