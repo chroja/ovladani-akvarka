@@ -36,10 +36,14 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #define SERIAL_INFO
 //#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
+#define LIGHT_CURVE_TEST
 
 bool SET_RTC = false;
 bool MESAURE_LIGHT_TEMP = true;
 bool SEARCH_ADDRESS_DS18B20 = true;
+bool TestRGB_T = false;
+
+
 //water sensor
 #ifdef CUSTOM_BOARD
     uint8_t T0SensorAddress[8] = {0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0}; //water sensor used on desk
@@ -68,21 +72,39 @@ int gamma[] = {
     215, 218, 220, 223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255
 };
 
-long LightCurve[][5] = {
-    // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
-    {0, 0, 0, 0, 0},                //00:00
-    {25200, 0, 0, 0, 0},            //7:00
-    {28800, 800, 600, 150, 300},    //8:00
-    {30600, 1000, 1000, 500, 1000}, //8:30
-    {43200, 1000, 1000, 500, 1000}, //12:00
-    {44100, 300, 300, 300, 300},    //12:15
-    {53100, 300, 300, 300, 300},    //14:45
-    {54000, 1000, 1000, 500, 1000}, //15:00
-    {70200, 1000, 1000, 500, 1000}, //19:30
-    {72000, 1000, 500, 200, 300},   //20:00 
-    {77400, 0, 0, 0, 0},            //21:30 
-    {86399, 0, 0, 0, 0},            //23:59:59
-};
+#ifdef LIGHT_CURVE_TEST
+    long LightCurve[][5] = {
+        // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
+        {0, 0, 0, 0, 0},                //00:00
+        {((6*3600)+(17*60)), 0, 0, 0, 0},
+        {((6*3600)+(30*60)), 800, 600, 150, 300},
+        {((6*3600)+(40*60)), 1000, 1000, 500, 1000},
+        {43200, 1000, 1000, 500, 1000},
+        {44100, 300, 300, 300, 300},
+        {53100, 300, 300, 300, 300},
+        {54000, 1000, 1000, 500, 1000},
+        {70200, 1000, 1000, 500, 1000},
+        {72000, 1000, 500, 200, 300}, 
+        {77400, 0, 0, 0, 0},
+        {86399, 0, 0, 0, 0}
+    };
+#else
+    long LightCurve[][5] = {
+        // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
+        {0, 0, 0, 0, 0},                //00:00
+        {25200, 0, 0, 0, 0},            //7:00
+        {28800, 800, 600, 150, 300},    //8:00
+        {30600, 1000, 1000, 500, 1000}, //8:30
+        {43200, 1000, 1000, 500, 1000}, //12:00
+        {44100, 300, 300, 300, 300},    //12:15
+        {53100, 300, 300, 300, 300},    //14:45
+        {54000, 1000, 1000, 500, 1000}, //15:00
+        {70200, 1000, 1000, 500, 1000}, //19:30
+        {72000, 1000, 500, 200, 300},   //20:00 
+        {77400, 0, 0, 0, 0},            //21:30 
+        {86399, 0, 0, 0, 0}             //23:59:59
+    };
+#endif
 
 int NumRows;
 int IndexRow;
@@ -124,10 +146,9 @@ rele_t Relay4;
 
 //variales Light
 #define LightWPin 10
-#define LightBtnPin 2
 #define RGBLightNum 4
-#define RGBDataPin 2
-#define RGBClockPin 3
+#define RGBDataPin 3
+#define RGBClockPin 4
 
 int RedCurr = 0;       //0-100
 int RedPrev = 0;       //0-100
@@ -324,7 +345,7 @@ void setup(){
     SensorsDS.begin();
     SerialInfoSetup();
     delay(500);
-    TestRGB()
+    TestRGB();
     Serial.println("------End setup-----");
 }
 
@@ -855,10 +876,10 @@ void PrepareShowLight (){
         
         ShowLight();
         Serial.print("\n********** Color Changed **********");
-        Serial.print("\nRed   from: ");     Serial.print(float(RedPrev)/10);       Serial.print(" % \tto: ");   Serial.print(float(RedCurr)/10);      Serial.print(" % \tPWM: ");  Serial.print(RedPwm);
-        Serial.print("\nGreen from: ");     Serial.print(float(GreenPrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(GreenCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(GreenPwm);
-        Serial.print("\nBlue  from: ");     Serial.print(float(BluePrev)/10);      Serial.print(" % \tto: ");   Serial.print(float(BlueCurr)/10);     Serial.print(" % \tPWM: ");  Serial.print(BluePwm);
-        Serial.print("\nWhite from: ");     Serial.print(float(WhitePrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(WhiteCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(WhitePwm);
+        Serial.print("\nRed   from: ");     Serial.print(float(RedPrev)/10);       Serial.print(" % \tto: ");   Serial.print(float(RedCurr)/10);      Serial.print(" % \tPWM: ");  Serial.print(RedPwm);    Serial.print(" \tGammma PWM: ");  Serial.print(gamma[RedPwm]);    
+        Serial.print("\nGreen from: ");     Serial.print(float(GreenPrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(GreenCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(GreenPwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[GreenPwm]);
+        Serial.print("\nBlue  from: ");     Serial.print(float(BluePrev)/10);      Serial.print(" % \tto: ");   Serial.print(float(BlueCurr)/10);     Serial.print(" % \tPWM: ");  Serial.print(BluePwm);   Serial.print(" \tGammma PWM: ");  Serial.print(gamma[BluePwm]);
+        Serial.print("\nWhite from: ");     Serial.print(float(WhitePrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(WhiteCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(WhitePwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[WhitePwm]);
         Serial.print("\n********** Color Changed **********");
         RedPrev = RedCurr;
         GreenPrev = GreenCurr;
@@ -886,39 +907,40 @@ void ShowLight(){
 }
 
 void TestRGB(){
-    Serial.println("testig rgb");
-    Serial.println("r");
-   for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(25, 0, 0);
+    if(TestRGB_T){
+        Serial.println("testig rgb");
+        Serial.println("r");
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(25, 0, 0);
+            FastLED.show();
+            wdt_reset();
+            delay(1000/RGBLightNum);
+        }
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(0, 0, 0);
+        }
         FastLED.show();
-        wdt_reset();
-        delay(1000/RGBLightNum);
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-    Serial.println("g");
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 25, 0);
+        Serial.println("g");
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(0, 25, 0);
+            FastLED.show();
+            wdt_reset();
+            delay(1000/RGBLightNum);
+        }
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(0, 0, 0);
+        }
         FastLED.show();
-        wdt_reset();
-        delay(1000/RGBLightNum));
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-    Serial.println("b");
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 25);
+        Serial.println("b");
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(0, 0, 25);
+            FastLED.show();
+            wdt_reset();
+            delay(1000/RGBLightNum);
+        }
+        for (int i = 0; i < RGBLightNum; i++) {
+            RBGLights[i] = CRGB(0, 0, 0);
+        }
         FastLED.show();
-        wdt_reset();
-        delay(1000/RGBLightNum));
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-     
+   }  
 }
