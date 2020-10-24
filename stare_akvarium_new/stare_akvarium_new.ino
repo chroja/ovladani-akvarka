@@ -36,7 +36,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #define SERIAL_INFO
 //#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
-#define LIGHT_CURVE_TEST
+//#define LIGHT_CURVE_TEST
 
 bool SET_RTC = false;
 bool MESAURE_LIGHT_TEMP = true;
@@ -453,10 +453,10 @@ void SerialInfo(){
             Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
             Serial.print("\nindex current row: ");    Serial.print(CurrentRow);
             Serial.print("\tindex target row: ");    Serial.print(TargetRow);
-            Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);
-            Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);
-            Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);
-            Serial.print("\t\tWhite: ");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);
+            Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);
+            Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[GreenPwm]);
+            Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tG PWM: ");  Serial.print(gamma[BluePwm]);
+            Serial.print("\t\tWhite: ");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[WhitePwm]);
             DEBUG_TimeStamp = TimeStamp;
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
