@@ -1107,3 +1107,41 @@ void Led(){
   PrevLightBtnState = LightBtnState;
  }
 
+
+void TestRGB(){
+    Serial.println("testig rgb");
+    Serial.println("r");
+   for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(25, 0, 0);
+        FastLED.show();
+        wdt_reset();
+        delay(1000/RGBLightNum);
+    }
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(0, 0, 0);
+    }
+    FastLED.show();
+    Serial.println("g");
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(0, 25, 0);
+        FastLED.show();
+        wdt_reset();
+        delay(1000/RGBLightNum));
+    }
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(0, 0, 0);
+    }
+    FastLED.show();
+    Serial.println("b");
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(0, 0, 25);
+        FastLED.show();
+        wdt_reset();
+        delay(1000/RGBLightNum));
+    }
+    for (int i = 0; i < RGBLightNum; i++) {
+        RBGLights[i] = CRGB(0, 0, 0);
+    }
+    FastLED.show();
+     
+}
