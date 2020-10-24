@@ -194,7 +194,7 @@ long NextReadTemp = 0;
 int ErrorTempMax = 10;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
-int TempReadPeriod = 15000; //15 sec
+int TempReadPeriod = 15; //15 sec
 //heat
 float TargetTemp = 25;
 float DeltaT = 0.5;
@@ -207,7 +207,7 @@ float MaximumLightTemp = 65; //degrees
 int PrevLightWOn;
 
 //time variable
-unsigned long DEBUG_TimeStamp = 0;
+int DEBUG_TimeStamp = 0;
 bool FirstRun = true;
 unsigned long OledRefresh = 0;
 int OledPageShowTime = 3; //sec
@@ -270,7 +270,7 @@ char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "p
 
 void setup(){
 
-    //wdt_enable(WDTO_2S);
+    wdt_enable(WDTO_2S);
 
     // serial comunication via USB
     Serial.begin(115200);
@@ -313,8 +313,6 @@ void setup(){
 
     Wire.begin();
 
-   
-
     while (!Serial); // Leonardo: wait for serial monitor
     Serial.println("\nI2C Scanner");
     I2CScanner();
@@ -350,7 +348,6 @@ void loop(){
     #ifdef SERIAL_INFO
         SerialInfo();
     #endif
-   
 }
 
 //****************************************** FUNCTION ****************************************
@@ -418,7 +415,7 @@ void SerialInfoSetup(){
 
 void SerialInfo(){
     #ifdef DEBUG
-        if (DEBUG_TimeStamp != TimeStamp){
+        if (TimeStamp != DEBUG_TimeStamp){
             Serial.println();
             Serial.println("------------------------------------------------------------");
             Serial.println("-------------------Start serial info------------------------");
@@ -468,7 +465,7 @@ void TimeRestart(){
 }
 
 void GetTemp(){
-    if (NextReadTemp <= millis()){
+    if (NextReadTemp >= TimeStamp){
         ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
         #ifdef DEBUG
             Serial.println("******** Start measure temp *******\n");
@@ -480,7 +477,7 @@ void GetTemp(){
         #else
             T1TempNoOffset = T0TempNoOffset;
         #endif
-        NextReadTemp = millis() + TempReadPeriod;
+        NextReadTemp = TimeStamp + TempReadPeriod;
                 #ifdef DEBUG
             Serial.println("Temp read.");
             Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
@@ -881,42 +878,4 @@ void ShowLight(){
     FastLED.show();
     analogWrite(LightWPin, WhitePwm);
     */
-}
-
-void TestRGB(){
-    Serial.println("testig rgb");
-    Serial.println("r");
-   for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(255, 0, 0);
-        FastLED.show();
-        wdt_reset();
-        delay(1000);
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-    Serial.println("g");
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 255, 0);
-        FastLED.show();
-        wdt_reset();
-        delay(1000);
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-    Serial.println("b");
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 255);
-        FastLED.show();
-        wdt_reset();
-        delay(1000);
-    }
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(0, 0, 0);
-    }
-    FastLED.show();
-     
 }
