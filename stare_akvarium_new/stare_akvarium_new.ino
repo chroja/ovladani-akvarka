@@ -16,6 +16,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 
 
 
+
 */
 
 //librlies
