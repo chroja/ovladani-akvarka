@@ -185,15 +185,7 @@ int TimeD = 0;
 int TimeH = 0;
 int TimeM = 0;
 int TimeS = 0;
-/*
-int NTimeY = 0;
-int NTimeMo = 0;
-int NTimeDay = 0;
-int NTimeD = 0;
-int NTimeH = 0;
-int NTimeM = 0;
-int NTimeS = 0;
-*/
+
 unsigned long RtcCurrentMillis = 0;
 unsigned long TimeStamp = 0;
 unsigned long LenghtDay = 86399;
@@ -292,7 +284,7 @@ char DayOfTheWeek[7][8] = {"nedele", "pondeli", "utery", "streda", "ctvrtek", "p
 
 void setup(){
 
-    //wdt_enable(WDTO_2S);
+    wdt_enable(WDTO_2S);
 
     // serial comunication via USB
     Serial.begin(115200);
@@ -361,9 +353,9 @@ void loop(){
         RtcCurrentMillis = millis();
     }
 
+    LightMode();
     LightBtnRead();
     PrepareShowLight();
-
 
     GetTemp();
     Heat();
@@ -453,6 +445,13 @@ void SerialInfo(){
             Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
             Serial.print("\nindex current row: ");    Serial.print(CurrentRow);
             Serial.print("\tindex target row: ");    Serial.print(TargetRow);
+            /*
+            Serial.println("SerialInfo");
+            Serial.println(RedPwm); 
+            Serial.println(GreenPwm); 
+            Serial.println(BluePwm); 
+            Serial.println(WhitePwm);
+            */
             Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);
             Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[GreenPwm]);
             Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tG PWM: ");  Serial.print(gamma[BluePwm]);
@@ -792,10 +791,22 @@ void LightMode(){
         if (PrevModeLight != 0){
             PrevModeLight = ModeLight;
             Serial.println("Light set to off mode.");
+            LightAuto = false;
             RedPwm = 0;
             GreenPwm = 0;
             BluePwm = 0;
             WhitePwm = 0;
+            RedPrev = 0;
+            GreenPrev = 0;
+            BluePrev = 0;
+            WhitePrev = 0;
+            /*
+            Serial.println("ModeLight");
+            Serial.println(RedPwm); 
+            Serial.println(GreenPwm); 
+            Serial.println(BluePwm); 
+            Serial.println(WhitePwm);
+            */
             ShowLight();
         }
     }
@@ -803,10 +814,22 @@ void LightMode(){
         if (PrevModeLight != 2){
             PrevModeLight = ModeLight;
             Serial.println("Light set to on mode.");
+            LightAuto = false;
             RedPwm = RedPwmMax;
             GreenPwm = GreenPwmMax;
             BluePwm = BluePwmMax;
             WhitePwm = WhitePwmMax;
+            RedPrev = 100;
+            GreenPrev = 100;
+            BluePrev = 100;
+            WhitePrev = 100;
+            /*
+            Serial.println("ModeLight");
+            Serial.println(RedPwm); 
+            Serial.println(GreenPwm); 
+            Serial.println(BluePwm); 
+            Serial.println(WhitePwm);
+            */
             ShowLight();
         }
     }
@@ -829,7 +852,7 @@ void LightBtnRead (){
         if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
             ModeLight = ModeLight + LightBtnDir;
             LightBtnState = digitalRead(LightBtnPin);
-            Serial.println(digitalRead(LightBtnPin));
+            //Serial.println(digitalRead(LightBtnPin));
             Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
             if((ModeLight == 0) || (ModeLight == 2)){
                 LightBtnDir = LightBtnDir * (-1);
@@ -890,20 +913,19 @@ void PrepareShowLight (){
 
 
 void ShowLight(){
-    
+    /*
+    Serial.println("ShowLight");
+    Serial.println(RedPwm); 
+    Serial.println(GreenPwm); 
+    Serial.println(BluePwm); 
+    Serial.println(WhitePwm); 
+    */
     for (int i = 0; i < RGBLightNum; i++) {
         RBGLights[i] = CRGB(gamma[RedPwm], gamma[GreenPwm], gamma[BluePwm]);
     }
     FastLED.show();
     analogWrite(LightWPin, gamma[WhitePwm]);
     Serial.print("\nWrite color");
-    /*
-    for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(RedPwm, GreenPwm, BluePwm);
-    }
-    FastLED.show();
-    analogWrite(LightWPin, WhitePwm);
-    */
 }
 
 void TestRGB(){
