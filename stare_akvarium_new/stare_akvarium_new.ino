@@ -41,7 +41,8 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 bool SET_RTC = false;
 bool MESAURE_LIGHT_TEMP = true;
 bool SEARCH_ADDRESS_DS18B20 = true;
-bool TestRGB_T = false;
+bool TEST_RGB = false;
+bool USE_GAMMA = false;
 
 
 //water sensor
@@ -332,7 +333,7 @@ void setup(){
     while (!Serial); // Leonardo: wait for serial monitor
     Serial.println("\nI2C Scanner");
     I2CScanner();
-    GetTimeSetup();
+    GetTime();
     DiscoverOneWireDevices();
     SensorsDS.begin();
     SerialInfoSetup();
@@ -383,16 +384,6 @@ void SetRTC(){
     }
 }
 
-void GetTimeSetup(){
-    DateTime = rtc.getDateTime();
-    TimeY = DateTime.year;
-    TimeMo = DateTime.month;
-    TimeDay = DateTime.day;
-    TimeH = DateTime.hour;
-    TimeM = DateTime.minute;
-    TimeS = DateTime.second;
-}
-
 void GetTime(){
     DateTime = rtc.getDateTime();
     int NTimeY = DateTime.year;
@@ -439,19 +430,9 @@ void SerialInfo(){
             Serial.println("-------------------Start serial info------------------------");
             Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
             Serial.print("\nTime Stamp (sec): " + String(TimeStamp));
-            Serial.print("\nHeat cable status: " + String(CableHeatState));
-            Serial.print("\t\tHeater  status: " + String(HeaterState));
-            Serial.print("\nT0 Temp (water): " + String(T0Temp));
-            Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
-            Serial.print("\nindex current row: ");    Serial.print(CurrentRow);
-            Serial.print("\tindex target row: ");    Serial.print(TargetRow);
-            /*
-            Serial.println("SerialInfo");
-            Serial.println(RedPwm); 
-            Serial.println(GreenPwm); 
-            Serial.println(BluePwm); 
-            Serial.println(WhitePwm);
-            */
+            Serial.print("\nHeat cable status: " + String(CableHeatState));         Serial.print("\t\tHeater  status: " + String(HeaterState));
+            Serial.print("\nT0 Temp (water): " + String(T0Temp));                   Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
+            Serial.print("\nindex current row: ");    Serial.print(CurrentRow);     Serial.print("\tindex target row: ");    Serial.print(TargetRow);
             Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);
             Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[GreenPwm]);
             Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tG PWM: ");  Serial.print(gamma[BluePwm]);
@@ -467,25 +448,19 @@ void SerialInfo(){
 void Restart(String Message, int Value){
     #ifdef RESTART
         Serial.println();
-        Serial.print("Why restart device: ");
-        Serial.print(Message);
-        Serial.print(" Value: ");
-        Serial.println(Value);
+        Serial.print("Why restart device: ");   Serial.print(Message);  Serial.print(" Value: ");   Serial.println(Value);
         Serial.println("--------------------------------------------------------------------------------------");
         Serial.println("----------------------------------------RESTART DEVICE--------------------------------");
         Serial.println("--------------------------------------------------------------------------------------");
-        Serial.println();
-        Serial.println();
+        Serial.println();   Serial.println();
         delay(500);
-        //digitalWrite(RestartPin, LOW);
         resetFunc(); //call reset
     #endif
 }
 
 void TimeRestart(){
     if ((TimeDay == 1) && (TimeH == 0) && (TimeM == 0) && (RtcCurrentMillis >= 120000)){
-        Serial.println("resetting");
-        resetFunc(); //call reset
+        Restart("weekly restart", TimeStamp);
     }
 }
 
@@ -503,7 +478,7 @@ void GetTemp(){
             T1TempNoOffset = T0TempNoOffset;
         #endif
         NextReadTemp = millis() + TempReadPeriod;
-                #ifdef DEBUG
+        #ifdef DEBUG
             Serial.println("Temp read.");
             Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
             Serial.println("Temp read.");
@@ -800,13 +775,6 @@ void LightMode(){
             GreenPrev = 0;
             BluePrev = 0;
             WhitePrev = 0;
-            /*
-            Serial.println("ModeLight");
-            Serial.println(RedPwm); 
-            Serial.println(GreenPwm); 
-            Serial.println(BluePwm); 
-            Serial.println(WhitePwm);
-            */
             ShowLight();
         }
     }
@@ -823,13 +791,6 @@ void LightMode(){
             GreenPrev = 100;
             BluePrev = 100;
             WhitePrev = 100;
-            /*
-            Serial.println("ModeLight");
-            Serial.println(RedPwm); 
-            Serial.println(GreenPwm); 
-            Serial.println(BluePwm); 
-            Serial.println(WhitePwm);
-            */
             ShowLight();
         }
     }
@@ -852,7 +813,6 @@ void LightBtnRead (){
         if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
             ModeLight = ModeLight + LightBtnDir;
             LightBtnState = digitalRead(LightBtnPin);
-            //Serial.println(digitalRead(LightBtnPin));
             Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
             if((ModeLight == 0) || (ModeLight == 2)){
                 LightBtnDir = LightBtnDir * (-1);
@@ -913,23 +873,26 @@ void PrepareShowLight (){
 
 
 void ShowLight(){
-    /*
-    Serial.println("ShowLight");
-    Serial.println(RedPwm); 
-    Serial.println(GreenPwm); 
-    Serial.println(BluePwm); 
-    Serial.println(WhitePwm); 
-    */
     for (int i = 0; i < RGBLightNum; i++) {
-        RBGLights[i] = CRGB(gamma[RedPwm], gamma[GreenPwm], gamma[BluePwm]);
+        if(USE_GAMMA){
+            RBGLights[i] = CRGB(gamma[RedPwm], gamma[GreenPwm], gamma[BluePwm]);
+        }
+        else{
+            RBGLights[i] = CRGB(RedPwm, GreenPwm, BluePwm);
+        }
     }
     FastLED.show();
-    analogWrite(LightWPin, gamma[WhitePwm]);
+    if(USE_GAMMA){
+        analogWrite(LightWPin, gamma[WhitePwm]);
+    }
+    else{
+        analogWrite(LightWPin, WhitePwm);
+    }
     Serial.print("\nWrite color");
 }
 
 void TestRGB(){
-    if(TestRGB_T){
+    if(TEST_RGB){
         Serial.println("testig rgb");
         Serial.println("r");
         for (int i = 0; i < RGBLightNum; i++) {
