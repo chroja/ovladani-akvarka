@@ -112,6 +112,15 @@ int IndexRow;
 int CurrentRow;
 int TargetRow;
 
+long FertilizationMap[][4] = {
+    // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100, 500, 285 - 10:00, pump 0, 4ml per 100 l
+    {68400, 0, 3, 100},
+    {69300, 1, 3, 100}
+};
+
+//int Fertilization
+
+
 U8GLIB_SH1106_128X64 Oled(0x3c);
 
 #define RelayPin1 34
@@ -122,9 +131,21 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
 #ifdef CUSTOM_BOARD
     #define TempPin 39
     #define LightBtnPin 2
+    #define LightPumpPim 8
+    const int FertilizationPumpDef[][3] = {
+        //{pin, calibration value (ml), calibration time (sec)} 32, 500, 285 - pin, calibration 500ml per 285 sec
+        {32, 500, 285},
+        {33, 500, 225}
+    };
 #else
     #define TempPin 43
-    #define LightBtnPin 6
+    #define LightBtnPin 2
+    #define LightPumpPim 30
+    const int FertilizationPumpDef[][3] = {
+        //{pin, calibration value (ml), calibration time (sec)} 32, 500, 285 - pin, calibration 500ml per 285 sec
+        {32, 500, 285},
+        {33, 500, 225}
+    };
 #endif
 
 #define NO 1
@@ -146,7 +167,7 @@ rele_t Relay3;
 rele_t Relay4;
 
 //variales Light
-#define LightWPin 10
+#define LightWPin 7
 #define RGBLightNum 4
 #define RGBDataPin 3
 #define RGBClockPin 4
@@ -174,6 +195,8 @@ int WhitePwmMax = 255;
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
 byte PrevModeLight = 0;
+bool LightPumState = 0;
+bool LightPumStatePrev = 0;
 
 CRGB RBGLights[RGBLightNum];
 
@@ -300,8 +323,12 @@ void setup(){
     }
     FastLED.show();
 
-    pinMode(LightWPin, OUTPUT);
-    digitalWrite(LightWPin, 0);
+    initPin(LightPumpPim, 0);
+    initPin(LightWPin, 0);
+    for(int i = 0; i < (sizeof(FertilizationPumpDef)/sizeof(FertilizationPumpDef[0])); i++){
+        initPin(FertilizationPumpDef[i][0], 0);
+    }
+
     pinMode(LightBtnPin, INPUT);
     LightBtnState = digitalRead(LightBtnPin);
 
@@ -370,9 +397,10 @@ void loop(){
 }
 
 //****************************************** FUNCTION ****************************************
-void initPin(int Pin){
+void initPin(int Pin, bool State){
     pinMode(Pin, OUTPUT);
-    digitalWrite(Pin, LOW);
+    digitalWrite(Pin, State);
+    Serial.print("Init pin: ");     Serial.print(Pin);  Serial.print("\t\tto state: ");     Serial.print(State);    Serial.print("\n");
 }
 
 void SetRTC(){
@@ -888,7 +916,24 @@ void ShowLight(){
     else{
         analogWrite(LightWPin, WhitePwm);
     }
-    Serial.print("\nWrite color");
+    Serial.print("\nWrite color\n");
+
+    if((RedPwm > 0) || (GreenPwm > 0) || (BluePwm > 0) || (WhitePwm > 0)){
+        LightPumState = 1;
+        if(LightPumStatePrev != 1){
+            digitalWrite(LightPumpPim, HIGH);
+            LightPumStatePrev = LightPumState;
+            Serial.println("Light pump turned on");
+        }
+    }
+    else if((RedPwm == 0) || (GreenPwm == 0) || (BluePwm == 0) || (WhitePwm == 0)){
+        LightPumState = 0;
+        if(LightPumStatePrev != 0){
+            digitalWrite(LightPumpPim, LOW);
+            LightPumStatePrev = LightPumState;
+            Serial.println("Light pump turned off");
+        }
+    }
 }
 
 void TestRGB(){
