@@ -43,6 +43,7 @@ bool MESAURE_LIGHT_TEMP = true;
 bool SEARCH_ADDRESS_DS18B20 = true;
 bool TEST_RGB = false;
 bool USE_GAMMA = false;
+bool GET_TEMP = true;
 
 
 //water sensor
@@ -112,11 +113,13 @@ int IndexRow;
 int CurrentRow;
 int TargetRow;
 
-long FertilizationMap[][4] = {
-    // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100, 500, 285 - 10:00, pump 0, 4ml per 100 l
-    {68400, 0, 3, 100},
-    {69300, 1, 3, 100}
+ long FertilizationMap[][4] = {
+    // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
+    {78000, 0, 3, 100},
+    {78030, 1, 3, 100}
 };
+
+unsigned int AquariumVolume = 300; //(l)
 
 //int Fertilization
 
@@ -169,6 +172,7 @@ rele_t Relay4;
 //variales Light
 #define LightWPin 7
 #define RGBLightNum 4
+
 #define RGBDataPin 3
 #define RGBClockPin 4
 
@@ -390,6 +394,7 @@ void loop(){
     FirstRun = false;
     TimeRestart();
     ShowOled();
+    Fertilization();
     #ifdef SERIAL_INFO
         SerialInfo();
     #endif
@@ -466,6 +471,7 @@ void SerialInfo(){
             Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tG PWM: ");  Serial.print(gamma[BluePwm]);
             Serial.print("\t\tWhite: ");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[WhitePwm]);
             DEBUG_TimeStamp = TimeStamp;
+            Serial.print("\nGet temp: ");     Serial.println(GET_TEMP);
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
             Serial.println("------------------------------------------------------------");
@@ -493,50 +499,52 @@ void TimeRestart(){
 }
 
 void GetTemp(){
-    if (NextReadTemp <= millis()){
-        ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
-        #ifdef DEBUG
-            Serial.println("******** Start measure temp *******\n");
-        #endif
-        SensorsDS.requestTemperatures();
-        T0TempNoOffset = ReadTemperature(T0SensorAddress);
-        #ifdef MESAURE_LIGHT_TEMP
-            T1TempNoOffset = ReadTemperature(T1SensorAddress);
-        #else
-            T1TempNoOffset = T0TempNoOffset;
-        #endif
-        NextReadTemp = millis() + TempReadPeriod;
-        #ifdef DEBUG
-            Serial.println("Temp read.");
-            Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
-            Serial.println("Temp read.");
-            Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "°C");
-        #endif
-        if ((T0TempNoOffset > -127) && (T0TempNoOffset < 85)){
-            if ((T1TempNoOffset > -127) && (T1TempNoOffset < 85)){
-                ErrorTempCurrent = 0;
-                T0Temp = T0TempNoOffset + T0Offset;
-                T1Temp = T1TempNoOffset + T1Offset;
-                #ifdef DEBUG
-                    Serial.println("\n--- Temp measure is ok. ---\n");
-                    Serial.println("T0 with offset temp is: " + String(T0Temp) + "°C");
-                    Serial.println("T1 with offset temp is: " + String(T1Temp) + "°C");
-                #endif
-            }
-        }
-        else if (ErrorTempCurrent < ErrorTempMax)        {
+    if(GET_TEMP){
+        if (NextReadTemp <= millis()){
+            ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
             #ifdef DEBUG
-                Serial.println("Temp measure is FAIL.");
-                Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
+                Serial.println("******** Start measure temp *******\n");
             #endif
-            ErrorTempCurrent++;
+            SensorsDS.requestTemperatures();
+            T0TempNoOffset = ReadTemperature(T0SensorAddress);
+            #ifdef MESAURE_LIGHT_TEMP
+                T1TempNoOffset = ReadTemperature(T1SensorAddress);
+            #else
+                T1TempNoOffset = T0TempNoOffset;
+            #endif
+            NextReadTemp = millis() + TempReadPeriod;
+            #ifdef DEBUG
+                Serial.println("Temp read.");
+                Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
+                Serial.println("Temp read.");
+                Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "°C");
+            #endif
+            if ((T0TempNoOffset > -127) && (T0TempNoOffset < 85)){
+                if ((T1TempNoOffset > -127) && (T1TempNoOffset < 85)){
+                    ErrorTempCurrent = 0;
+                    T0Temp = T0TempNoOffset + T0Offset;
+                    T1Temp = T1TempNoOffset + T1Offset;
+                    #ifdef DEBUG
+                        Serial.println("\n--- Temp measure is ok. ---\n");
+                        Serial.println("T0 with offset temp is: " + String(T0Temp) + "°C");
+                        Serial.println("T1 with offset temp is: " + String(T1Temp) + "°C");
+                    #endif
+                }
+            }
+            else if (ErrorTempCurrent < ErrorTempMax)        {
+                #ifdef DEBUG
+                    Serial.println("Temp measure is FAIL.");
+                    Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
+                #endif
+                ErrorTempCurrent++;
+            }
+            else{
+                Restart("Lot of error measure. Total: ", ErrorTempCurrent);
+            }
+            Serial.println("\n******* END measure temp **********");
+            Serial.println();
+            Serial.println();
         }
-        else{
-            Restart("Lot of error measure. Total: ", ErrorTempCurrent);
-        }
-        Serial.println("\n******* END measure temp **********");
-        Serial.println();
-        Serial.println();
     }
 }
 
@@ -973,4 +981,41 @@ void TestRGB(){
         }
         FastLED.show();
    }  
+}
+
+void Fertilization (){
+    int FertilizationIndexRowMax = (sizeof(FertilizationMap)/sizeof(FertilizationMap[0]));
+    for(int i = 0; i < FertilizationIndexRowMax; i++) {
+        if(((TimeStamp+5) >= FertilizationMap[i][0]) && ((TimeStamp) <= FertilizationMap[i][0])){
+            if(GET_TEMP){
+                GET_TEMP = false;
+            }
+        }
+        if(((TimeStamp+1) >= FertilizationMap[i][0]) && ((TimeStamp) <= FertilizationMap[i][0])){
+            Serial.print("\n\t\t-----Start fertilization-----");
+            unsigned long FertilizationStartMillis = millis();
+            float FertilizationVolume = (AquariumVolume / FertilizationMap[i][3]) * FertilizationMap[i][2];
+            unsigned int FertilizationCalibration =  float(FertilizationPumpDef[FertilizationMap[i][1]][2]) / float(FertilizationPumpDef[FertilizationMap[i][1]][1]) * float(1000);
+            unsigned long FertilizationTime = FertilizationCalibration * FertilizationVolume;
+            int PumpPin = FertilizationPumpDef[FertilizationMap[i][1]][0];
+            
+            Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
+            Serial.print("\nFertilization volume: \t\t");           Serial.print(FertilizationVolume);              Serial.print(" ml"); 
+            Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
+            Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
+
+            while (millis() < (FertilizationStartMillis + FertilizationTime)){
+                //code tento while to nesmí opustit  dokud nebude pohnojeno
+                digitalWrite(PumpPin, HIGH);
+                Serial.print(".");
+                delay(100);
+                wdt_reset(); 
+            }
+
+            digitalWrite(PumpPin, LOW);
+            GET_TEMP = true;
+            Serial.print("\n\t\t-----End fertilization-----");
+            Serial.print("\n");
+        }
+    }
 }
