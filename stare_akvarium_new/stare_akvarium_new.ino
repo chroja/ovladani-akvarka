@@ -42,7 +42,8 @@ bool SET_RTC = false;
 bool MESAURE_LIGHT_TEMP = true;
 bool SEARCH_ADDRESS_DS18B20 = true;
 bool TEST_RGB = false;
-bool USE_GAMMA = false;
+bool USE_GAMMA_RGB = false;
+bool USE_GAMMA_WHITE = true;
 bool GET_TEMP = true;
 
 
@@ -115,8 +116,8 @@ int TargetRow;
 
  long FertilizationMap[][4] = {
     // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
-    {78000, 0, 3, 100},
-    {78030, 1, 3, 100}
+    {43100, 0, 3, 100},
+    {43150, 1, 3, 100}
 };
 
 unsigned int AquariumVolume = 300; //(l)
@@ -910,7 +911,7 @@ void PrepareShowLight (){
 
 void ShowLight(){
     for (int i = 0; i < RGBLightNum; i++) {
-        if(USE_GAMMA){
+        if(USE_GAMMA_RGB){
             RBGLights[i] = CRGB(gamma[RedPwm], gamma[GreenPwm], gamma[BluePwm]);
         }
         else{
@@ -918,7 +919,7 @@ void ShowLight(){
         }
     }
     FastLED.show();
-    if(USE_GAMMA){
+    if(USE_GAMMA_WHITE){
         analogWrite(LightWPin, gamma[WhitePwm]);
     }
     else{
