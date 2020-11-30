@@ -226,7 +226,7 @@ float T1Temp = 0; //temp on T1 with calibration offset
 float T0TempNoOffset = 0;
 float T1TempNoOffset = 0;
 #ifdef TEMP_OFFSET
-float T0Offset = 0;
+float T0Offset = 6;
 float T1Offset = 0;
 #else
 float T0Offset = 0;
@@ -253,7 +253,7 @@ int PrevLightWOn;
 unsigned long DEBUG_TimeStamp = 0;
 bool FirstRun = true;
 unsigned long OledRefresh = 0;
-int OledPageShowTime = 3; //sec
+unsigned long OledPageShowTime = 3; //sec
 unsigned long OledShowCurrentPage = 0;
 byte CurrentPage, PrevPage = 0;
 
@@ -661,8 +661,8 @@ void I2CScanner(){
 }
 
 void OledDrawPages(){
-    if(TimeStamp > LenghtDay){
-        OledShowCurrentPage = 0;
+    if(((OledShowCurrentPage + OledPageShowTime) > LenghtDay) && (TimeStamp < 15)){
+        OledShowCurrentPage = TimeStamp;
     }
     if (TimeStamp >= (OledShowCurrentPage + OledPageShowTime)){
         CurrentPage++;
