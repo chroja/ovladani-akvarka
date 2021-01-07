@@ -35,7 +35,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #define RESTART
 #define SERIAL_INFO
 //#define CUSTOM_BOARD
-#define MESAURE_LED_TEMP
+//#define MESAURE_LED_TEMP
 //#define LIGHT_CURVE_TEST
 
 bool SET_RTC = false;
@@ -49,12 +49,19 @@ bool GET_TEMP = true;
 
 //water sensor
 #ifdef CUSTOM_BOARD
-    uint8_t T0SensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used on desk
+    uint8_t WaterSensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used on desk
     uint8_t T1SensorAddress[8] = {0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59}; //led sensor used on desk
 #else
-    uint8_t T0SensorAddress[8] = {0x28, 0xA5, 0x6A, 0x56, 0xB5, 0x01, 0x3C, 0x84}; //water sensor used in aquarium
-    uint8_t T2SensorAddress[8] = {0x28, 0x77, 0x2B, 0x56, 0xB5, 0x01, 0x3C, 0x0A}; //water sensor used in aquarium
-    uint8_t T3SensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used in aquarium
+/*
+    uint8_t WaterSensorAddress[8] = {0x28, 0xA5, 0x6A, 0x56, 0xB5, 0x01, 0x3C, 0x84}; //water sensor used in aquarium
+    uint8_t T1SensorAddress[8] = {0x28, 0x77, 0x2B, 0x56, 0xB5, 0x01, 0x3C, 0x0A}; //water sensor used in aquarium
+    uint8_t T2SensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used in aquarium
+    */
+    uint8_t WaterSensorAddress[][8] = {
+        {0x28, 0xA5, 0x6A, 0x56, 0xB5, 0x01, 0x3C, 0x84}, //water sensor used in aquarium
+        {0x28, 0x77, 0x2B, 0x56, 0xB5, 0x01, 0x3C, 0x0A}, //water sensor used in aquarium
+        {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10} //water sensor used in aquarium
+        };
 #endif
 
 int gamma[] = {
@@ -237,20 +244,24 @@ unsigned long LenghtDay = 86399;
 
 //temp
 //DS tem sensors
-float T0Temp = 0; //temp on T0 with calibration offset
+float WaterTemp [] = {}; //temp on Water with calibration offset
+float AvgWaterTemp = 0;
 float T1Temp = 0; //temp on T1 with calibration offset
-float T0TempNoOffset = 0;
+float WaterTempNoOffset [] = {};
 float T1TempNoOffset = 0;
 #ifdef TEMP_OFFSET
-float T0Offset = 5.5;
+//float WaterOffset = 0;
+float WaterOffset [] = {-0.7, -0.8, -1};
 float T1Offset = 0;
 #else
-float T0Offset = 0;
+float WaterOffset [3] = {0, 0, 0};
 float T1Offset = 0;
 #endif
 
+
+
 long NextReadTemp = 0;
-int ErrorTempMax = 10;
+int ErrorTempMax = 20;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
@@ -355,12 +366,12 @@ void setup(){
 
     //relaay declaration
     CableHeat.pin = RelayPin1;
-    CableHeat.type = NC;
+    CableHeat.type = NO;
     pinMode(CableHeat.pin, OUTPUT);
     RelayOff(CableHeat);
 
     Heater.pin = RelayPin2;
-    Heater.type = NC;
+    Heater.type = NO;
     pinMode(Heater.pin, OUTPUT);
     RelayOff(Heater);
 
@@ -481,7 +492,7 @@ void SerialInfo(){
             Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
             Serial.print("\nTime Stamp (sec): " + String(TimeStamp));
             Serial.print("\nHeat cable status: " + String(CableHeatState));         Serial.print("\t\tHeater  status: " + String(HeaterState));
-            Serial.print("\nT0 Temp (water): " + String(T0Temp));                   Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
+            Serial.print("\nWater Temp (water): " + String(AvgWaterTemp));                   //Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
             Serial.print("\nindex current row: ");    Serial.print(CurrentRow);     Serial.print("\tindex target row: ");    Serial.print(TargetRow);
             Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);
             Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[GreenPwm]);
@@ -519,49 +530,48 @@ void GetTemp(){
     if(GET_TEMP){
         if (NextReadTemp <= millis()){
             ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
+            
             #ifdef DEBUG
                 Serial.println("******** Start measure temp *******\n");
             #endif
             SensorsDS.requestTemperatures();
-            T0TempNoOffset = ReadTemperature(T0SensorAddress);
-            #ifdef MESAURE_LIGHT_TEMP
-                T1TempNoOffset = ReadTemperature(T1SensorAddress);
-            #else
-                T1TempNoOffset = T0TempNoOffset;
-            #endif
-            NextReadTemp = millis() + TempReadPeriod;
-            #ifdef DEBUG
-                Serial.println("Temp read.");
-                Serial.println("T0 read temp is: " + String(T0TempNoOffset) + "°C");
-                Serial.println("Temp read.");
-                Serial.println("T1 read temp is: " + String(T1TempNoOffset) + "°C");
-            #endif
-            if ((T0TempNoOffset > -127) && (T0TempNoOffset < 85)){
-                if ((T1TempNoOffset > -127) && (T1TempNoOffset < 85)){
+            int NumWaterSensor = (sizeof(WaterSensorAddress)/sizeof(WaterSensorAddress[0]));
+            
+            for (byte i = 0; i < NumWaterSensor; i++){
+                WaterTempNoOffset[i] = ReadTemperature(WaterSensorAddress[i]);
+                Serial.println("Water temp without offset is: " + String(WaterTempNoOffset [i]) + "°C. On sensor: " + i);
+                if (( WaterTempNoOffset[i] > -127) && ( WaterTempNoOffset[i] < 85)){
                     ErrorTempCurrent = 0;
-                    T0Temp = T0TempNoOffset + T0Offset;
-                    T1Temp = T1TempNoOffset + T1Offset;
+                    WaterTemp[i] = WaterTempNoOffset[i] + WaterOffset[i];
                     #ifdef DEBUG
                         Serial.println("\n--- Temp measure is ok. ---\n");
-                        Serial.println("T0 with offset temp is: " + String(T0Temp) + "°C");
-                        Serial.println("T1 with offset temp is: " + String(T1Temp) + "°C");
+                        Serial.println("Water temp with offset on sensor: " + String(i) + " is " + String(WaterTemp[i]) + "°C\n\n");
                     #endif
                 }
+                
+                else if (ErrorTempCurrent < ErrorTempMax)        {
+                    #ifdef DEBUG
+                        Serial.println("Temp measure is FAIL.");
+                        Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
+                    #endif
+                    ErrorTempCurrent++;
+                }
+                else{
+                    Restart("Lot of error measure. Total: ", ErrorTempCurrent);
+                }
             }
-            else if (ErrorTempCurrent < ErrorTempMax)        {
-                #ifdef DEBUG
-                    Serial.println("Temp measure is FAIL.");
-                    Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
-                #endif
-                ErrorTempCurrent++;
+
+            AvgWaterTemp = 0;
+            for (byte i = 0; i < NumWaterSensor; i++){
+                AvgWaterTemp = AvgWaterTemp + WaterTemp[i];
             }
-            else{
-                Restart("Lot of error measure. Total: ", ErrorTempCurrent);
-            }
+            AvgWaterTemp = AvgWaterTemp / NumWaterSensor;
+            NextReadTemp = millis() + TempReadPeriod;
+            Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C");
             Serial.println("\n******* END measure temp **********");
             Serial.println();
             Serial.println();
-        }
+        } 
     }
 }
 
@@ -603,29 +613,29 @@ float ReadTemperature(DeviceAddress deviceAddress){
 }
 
 void Heat(){
-    if (T0Temp != 0){
-        if ((T0Temp <= TargetTemp) && (CableHeatState != 1)){
+    if (AvgWaterTemp != 0){
+        if ((AvgWaterTemp <= TargetTemp) && (CableHeatState != 1)){
             CableHeatState = 1;
             RelayOn(CableHeat);
             #ifdef DEBUG
                 Serial.println("Heat cable is on.");
             #endif
         }
-        else if ((T0Temp >= (TargetTemp + DeltaT)) && (CableHeatState == 1)){
+        else if ((AvgWaterTemp >= (TargetTemp + DeltaT)) && (CableHeatState == 1)){
             CableHeatState = 0;
             RelayOff(CableHeat);
             #ifdef DEBUG
                 Serial.println("Heat cable is off. Standart turn off.");
             #endif
         }
-        if ((T0Temp <= (TargetTemp - DeltaT)) && (HeaterState != 1)){
+        if ((AvgWaterTemp <= (TargetTemp - DeltaT)) && (HeaterState != 1)){
             HeaterState = 1;
             RelayOn(Heater);
             #ifdef DEBUG
                 Serial.println("Heater in water is on.");
             #endif
         }
-        else if ((T0Temp >= TargetTemp) && (HeaterState == 1)){
+        else if ((AvgWaterTemp >= TargetTemp) && (HeaterState == 1)){
             HeaterState = 0;
             RelayOff(Heater);
             #ifdef DEBUG
@@ -750,14 +760,16 @@ void OledTimePage(){
 
 void OledTempPage(){
     OledLeftText(0);
-    Oled.print("Water: ");
-    Oled.print(T0Temp);
+    Oled.print("Avg Water: ");
+    Oled.print(AvgWaterTemp);
     Oled.print(" C");
+    /*
     OledLeftText(1);
     Oled.print("Led: ");
     Oled.print(T1Temp);
     Oled.print(" C");
-    OledLeftText(2);
+    */
+    OledLeftText(1);
     Oled.print("Heat cable: ");
     if (CableHeatState == 0){
         Oled.print("OFF");
@@ -769,7 +781,7 @@ void OledTempPage(){
         Oled.print("ERR");
     }
 
-    OledLeftText(3);
+    OledLeftText(2);
     Oled.print("Heater: ");
     if (HeaterState == 0){
         Oled.print("OFF");
