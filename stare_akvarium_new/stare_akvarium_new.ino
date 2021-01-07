@@ -35,7 +35,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #define RESTART
 #define SERIAL_INFO
 //#define CUSTOM_BOARD
-//#define MESAURE_LED_TEMP
+#define MESAURE_LED_TEMP
 //#define LIGHT_CURVE_TEST
 
 bool SET_RTC = false;
@@ -49,11 +49,12 @@ bool GET_TEMP = true;
 
 //water sensor
 #ifdef CUSTOM_BOARD
-    uint8_t T0SensorAddress[8] = {0x28, 0x75, 0x3F, 0x79, 0xA2, 0x16, 0x03, 0xA0}; //water sensor used on desk
+    uint8_t T0SensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used on desk
     uint8_t T1SensorAddress[8] = {0x28, 0x0A, 0x23, 0x79, 0xA2, 0x19, 0x03, 0x59}; //led sensor used on desk
 #else
-    uint8_t T1SensorAddress[8] = {0x28, 0x1E, 0x66, 0xDA, 0x1E, 0x19, 0x01, 0x7F}; //water sensor used in aquarium
-    uint8_t T0SensorAddress[8] = {0x28, 0xC7, 0x25, 0x79, 0xA2, 0x19, 0x03, 0x10}; //water sensor used in aquarium
+    uint8_t T0SensorAddress[8] = {0x28, 0xA5, 0x6A, 0x56, 0xB5, 0x01, 0x3C, 0x84}; //water sensor used in aquarium
+    uint8_t T2SensorAddress[8] = {0x28, 0x77, 0x2B, 0x56, 0xB5, 0x01, 0x3C, 0x0A}; //water sensor used in aquarium
+    uint8_t T3SensorAddress[8] = {0x28, 0x06, 0x3B, 0xF8, 0x08, 0x00, 0x00, 0x10}; //water sensor used in aquarium
 #endif
 
 int gamma[] = {
@@ -92,14 +93,28 @@ int gamma[] = {
         {86399, 0, 0, 0, 0}
     };
 #else
+    /*
     long LightCurve[][5] = {
         // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
         {0, 0, 0, 0, 0},                //00:00
-        {25200, 0, 0, 0, 0},            //7:00
-        {28800, 800, 600, 150, 300},    //8:00
-        {30600, 1000, 1000, 500, 1000}, //8:30
-        {43200, 1000, 1000, 500, 1000}, //12:00
+        {36000, 0, 0, 0, 0},            //10:00
+        {39600, 800, 600, 150, 300},    //11:00
+        {41400, 1000, 1000, 500, 700}, //11:30
+        {43200, 1000, 1000, 500, 700}, //12:00
         {44100, 300, 300, 300, 300},    //12:15
+        {53100, 300, 300, 300, 300},    //14:45
+        {54000, 1000, 1000, 500, 700}, //15:00
+        {70200, 1000, 1000, 500, 700}, //19:30
+        {72000, 1000, 500, 200, 300},   //20:00 
+        {77400, 0, 0, 0, 0},            //21:30 
+        {86399, 0, 0, 0, 0}             //23:59:59
+    };
+    */
+   
+    long LightCurve[][5] = {
+        // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
+        {0, 0, 0, 0, 0},                //00:00
+        {52200, 0, 0, 0, 0},            //10:00
         {53100, 300, 300, 300, 300},    //14:45
         {54000, 1000, 1000, 500, 1000}, //15:00
         {70200, 1000, 1000, 500, 1000}, //19:30
@@ -107,6 +122,7 @@ int gamma[] = {
         {77400, 0, 0, 0, 0},            //21:30 
         {86399, 0, 0, 0, 0}             //23:59:59
     };
+    
 #endif
 
 int NumRows;
@@ -226,7 +242,7 @@ float T1Temp = 0; //temp on T1 with calibration offset
 float T0TempNoOffset = 0;
 float T1TempNoOffset = 0;
 #ifdef TEMP_OFFSET
-float T0Offset = 6;
+float T0Offset = 5.5;
 float T1Offset = 0;
 #else
 float T0Offset = 0;
