@@ -5,6 +5,7 @@ LED DRIVER                                    https://github.com/MrKrabat/LED-St
 RTClib                                        https://navody.arduino-shop.cz/docs/texty/0/7/rtclib.zip
 DS18B20                                       https://navody.arduino-shop.cz/docs/texty/0/14/dallastemperature.zip
 OneWire                                       https://navody.arduino-shop.cz/docs/texty/0/15/onewire.zip
+DS3231                                        https://navody.dratek.cz/docs/texty/0/243/arduino_ds3231_master.zip
 
 pumpa 520ms/ml
 
@@ -122,8 +123,8 @@ int gamma[] = {
         // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
         {0, 0, 0, 0, 0},                //00:00
         {52200, 0, 0, 0, 0},            //10:00
-        {53100, 300, 300, 300, 300},    //14:45
-        {54000, 1000, 1000, 500, 1000}, //15:00
+        {49500, 300, 300, 300, 300},    //13:45
+        {50400, 1000, 1000, 500, 1000}, //14:00
         {70200, 1000, 1000, 500, 1000}, //19:30
         {72000, 1000, 500, 200, 300},   //20:00 
         {77400, 0, 0, 0, 0},            //21:30 
@@ -139,7 +140,7 @@ int TargetRow;
 
  long FertilizationMap[][4] = {
     // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
-    {43100, 0, 3, 100},
+    {43000, 0, 3, 100},
     {43150, 1, 3, 100}
 };
 
@@ -203,22 +204,22 @@ rele_t Relay4;
 int RedCurr = 0;       //0-100
 int RedPrev = 0;       //0-100
 int RedPwm = 0;        //0-255
-int RedPwmMax = 255;   //0-255
+int RedPwmMax = 195;   //0-255
 
 int GreenCurr = 0;
 int GreenPrev = 0;
 int GreenPwm = 0;
-int GreenPwmMax = 255;
+int GreenPwmMax = 195;
 
 int BlueCurr = 0;
 int BluePrev = 0;
 int BluePwm = 0;
-int BluePwmMax = 255;
+int BluePwmMax = 195;
 
 int WhiteCurr = 0; 
 int WhitePrev = 0;
 int WhitePwm = 0;
-int WhitePwmMax = 255;
+int WhitePwmMax = 195;
 
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
@@ -564,10 +565,13 @@ void GetTemp(){
             AvgWaterTemp = 0;
             for (byte i = 0; i < NumWaterSensor; i++){
                 AvgWaterTemp = AvgWaterTemp + WaterTemp[i];
+                Serial.println(WaterTemp[i]);
+                Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C run: " + i);
             }
-            AvgWaterTemp = AvgWaterTemp / NumWaterSensor;
+            AvgWaterTemp = AvgWaterTemp / float(NumWaterSensor);
             NextReadTemp = millis() + TempReadPeriod;
             Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C");
+            Serial.println(AvgWaterTemp);
             Serial.println("\n******* END measure temp **********");
             Serial.println();
             Serial.println();
