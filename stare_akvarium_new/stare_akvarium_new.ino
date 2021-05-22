@@ -46,6 +46,7 @@ bool TEST_RGB = false;
 bool USE_GAMMA_RGB = false;
 bool USE_GAMMA_WHITE = true;
 bool GET_TEMP = true;
+bool FLOODING_PUMP = false;
 
 
 //water sensor
@@ -122,7 +123,7 @@ int gamma[] = {
     long LightCurve[][5] = {
         // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
         {0, 0, 0, 0, 0},                //00:00
-        {52200, 0, 0, 0, 0},            //10:00
+        {43200, 0, 0, 0, 0},            //10:00
         {49500, 300, 300, 300, 300},    //13:45
         {50400, 1000, 1000, 500, 1000}, //14:00
         {70200, 1000, 1000, 500, 1000}, //19:30
@@ -140,13 +141,14 @@ int TargetRow;
 
  long FertilizationMap[][4] = {
     // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
-    {43000, 0, 3, 100},
-    {43150, 1, 3, 100}
+    {39600, 0, 7, 100},
+    {39660, 1, 7, 100}
 };
 
 unsigned int AquariumVolume = 300; //(l)
 
 //int Fertilization
+int FloodingVolume = 10;
 
 
 U8GLIB_SH1106_128X64 Oled(0x3c);
@@ -171,7 +173,7 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
     #define LightPumpPim 30
     const int FertilizationPumpDef[][3] = {
         //{pin, calibration value (ml), calibration time (sec)} 32, 500, 285 - pin, calibration 500ml per 285 sec
-        {32, 500, 285},
+        {31, 500, 285},
         {33, 500, 225}
     };
 #endif
@@ -219,7 +221,7 @@ int BluePwmMax = 195;
 int WhiteCurr = 0; 
 int WhitePrev = 0;
 int WhitePwm = 0;
-int WhitePwmMax = 195;
+int WhitePwmMax = 205;
 
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
@@ -880,20 +882,25 @@ void LightBtnRead (){
     if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
         delay(20);
         if ((digitalRead(LightBtnPin) == 1) && (PrevLightBtnState != 1)){
-            ModeLight = ModeLight + LightBtnDir;
-            LightBtnState = digitalRead(LightBtnPin);
-            Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
-            if((ModeLight == 0) || (ModeLight == 2)){
-                LightBtnDir = LightBtnDir * (-1);
+            if(FLOODING_PUMP){
+                FloodingPump();
+            }
+            if (!FLOODING_PUMP){
+                ModeLight = ModeLight + LightBtnDir;
+                LightBtnState = digitalRead(LightBtnPin);
+                Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
+                if((ModeLight == 0) || (ModeLight == 2)){
+                    LightBtnDir = LightBtnDir * (-1);
                     if(LightBtnDir > 0){
                         Serial.println("func LightBtnRead -- next LightBtnDir: +");
                     }
                     if(LightBtnDir < 0){
                         Serial.println("func LightBtnRead -- next LightBtnDir: -");
                     }
-                
+                    
+                }
             }
-        }   
+        }    
     }
     PrevLightBtnState = LightBtnState;
 }
@@ -1051,4 +1058,38 @@ void Fertilization (){
             Serial.print("\n");
         }
     }
+}
+
+void FloodingPump(){
+    int FertilizationIndexRowMax = (sizeof(FertilizationMap)/sizeof(FertilizationMap[0]));
+    for(int i = 0; i < FertilizationIndexRowMax; i++) {
+        if(GET_TEMP){
+            GET_TEMP = false;
+        }
+        Serial.print("\n\t\t-----Start flooding fertilization-----");
+        unsigned long FertilizationStartMillis = millis();
+        unsigned int FertilizationCalibration =  float(FertilizationPumpDef[FertilizationMap[i][1]][2]) / float(FertilizationPumpDef[FertilizationMap[i][1]][1]) * float(1000);
+        unsigned long FertilizationTime = FertilizationCalibration * FloodingVolume;
+        int PumpPin = FertilizationPumpDef[FertilizationMap[i][1]][0];
+
+        Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
+        Serial.print("\nFlooding volume: \t\t");                Serial.print(FloodingVolume);                   Serial.print(" ml"); 
+        Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
+        Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
+
+        while (millis() < (FertilizationStartMillis + FertilizationTime)){
+            //code tento while to nesmí opustit  dokud nebude pohnojeno
+            digitalWrite(PumpPin, HIGH);
+            Serial.print(".");
+            delay(100);
+            wdt_reset(); 
+        }
+
+        digitalWrite(PumpPin, LOW);
+        
+        Serial.print("\n\t\t-----End fertilization-----");
+        Serial.print("\n");
+    }
+    GET_TEMP = true;
+    FLOODING_PUMP = false;
 }

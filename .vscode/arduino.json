@@ -1,6 +1,6 @@
 {
     "board": "arduino:avr:mega",
     "configuration": "cpu=atmega2560",
-    "port": "COM3",
-    "sketch": "filter_light.ino"
+    "port": "COM11",
+    "sketch": "stare_akvarium_new\\stare_akvarium_new.ino"
 }
