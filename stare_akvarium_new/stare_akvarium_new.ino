@@ -123,12 +123,12 @@ int gamma[] = {
     long LightCurve[][5] = {
         // {target time, target red, target green, target blue, target white} - first time must bee 0, last time must bee 86 399 (sec), color 0,0%-100,0% (0-1000)
         {0, 0, 0, 0, 0},                //00:00
-        {43200, 0, 0, 0, 0},            //10:00
-        {49500, 300, 300, 300, 300},    //13:45
-        {50400, 1000, 1000, 500, 1000}, //14:00
-        {70200, 1000, 1000, 500, 1000}, //19:30
-        {72000, 1000, 500, 200, 300},   //20:00 
-        {77400, 0, 0, 0, 0},            //21:30 
+        {39600, 0, 0, 0, 0},            //11:00
+        {45900, 300, 300, 300, 300},    //12:45
+        {50400, 950, 950, 475, 950},    //13:00
+        {70200, 950, 950, 475, 950},    //19:30
+        {72000, 950, 500, 200, 300},    //20:00 
+        {75600, 0, 0, 0, 0},            //21:00 
         {86399, 0, 0, 0, 0}             //23:59:59
     };
     
@@ -141,8 +141,8 @@ int TargetRow;
 
  long FertilizationMap[][4] = {
     // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
-    {39600, 0, 7, 100},
-    {39660, 1, 7, 100}
+    {36000, 0, 7, 100},
+    {33660, 1, 7, 100}
 };
 
 unsigned int AquariumVolume = 300; //(l)
@@ -206,22 +206,22 @@ rele_t Relay4;
 int RedCurr = 0;       //0-100
 int RedPrev = 0;       //0-100
 int RedPwm = 0;        //0-255
-int RedPwmMax = 195;   //0-255
+int RedPwmMax = 255;//195;   //0-255
 
 int GreenCurr = 0;
 int GreenPrev = 0;
 int GreenPwm = 0;
-int GreenPwmMax = 195;
+int GreenPwmMax = 255;//195;
 
 int BlueCurr = 0;
 int BluePrev = 0;
 int BluePwm = 0;
-int BluePwmMax = 195;
+int BluePwmMax = 255;//195;
 
 int WhiteCurr = 0; 
 int WhitePrev = 0;
 int WhitePwm = 0;
-int WhitePwmMax = 205;
+int WhitePwmMax = 255;//205;
 
 bool LightAuto = true;
 byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
