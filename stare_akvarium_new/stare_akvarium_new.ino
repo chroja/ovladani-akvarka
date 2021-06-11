@@ -178,11 +178,11 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
     };
 #endif
 
-#define NO 1
-#define NC 0
+#define NO 0
+#define NC 1
 
-#define ON HIGH
-#define OFF LOW
+#define ON 1
+#define OFF 0
 
 typedef struct
 {
@@ -269,7 +269,7 @@ int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
 //heat
-float TargetTemp = 25;
+float TargetTemp = 28;
 float DeltaT = 0.5;
 int Heat1SafeTemp = 28;
 bool CableHeatState = 0;
@@ -298,33 +298,58 @@ char LightBtnDir = 1;
 
 void RelayOn(rele_t vstup){
     // NO musime zapnout 1
+    Serial.println("RelayOn 1");
+    Serial.println(vstup.state);
+    Serial.println(digitalRead(vstup.pin));
     if (vstup.type == NO){
         digitalWrite(vstup.pin, HIGH);
+        Serial.println("RelayOn 2");
+        Serial.println(vstup.state);
+        Serial.println(digitalRead(vstup.pin));
     }
     // NC musime zapnout 0
     else{
         digitalWrite(vstup.pin, LOW);
+        Serial.println("RelayOn 3");
+        Serial.println(vstup.state);
+        Serial.println(digitalRead(vstup.pin));
     }
     // nastaveni stavove promenne
-    vstup.state = ON;
+    vstup.state = 1;
+    Serial.println("RelayOn 4");
+    Serial.println(vstup.state);
+    Serial.println(digitalRead(vstup.pin));
+    
 }
 
 void RelayOff(rele_t vstup){
     // NO musime vypnout 0
+    Serial.println("RelayOff 1");
+    Serial.println(vstup.state);
+    Serial.println(digitalRead(vstup.pin));
     if (vstup.type == NO){
         digitalWrite(vstup.pin, LOW);
+        Serial.println("RelayOff 2");
+        Serial.println(vstup.state);
+        Serial.println(digitalRead(vstup.pin));
     }
     // NC musime vypnout 1
     else{
         digitalWrite(vstup.pin, HIGH);
+        Serial.println("RelayOff 3");
+        Serial.println(vstup.state);
+        Serial.println(digitalRead(vstup.pin));
     }
     // nastaveni stavove promenne
-    vstup.state = OFF;
+    vstup.state = 0;
+    Serial.println("RelayOff 4");
+    Serial.println(vstup.state);
+    Serial.println(digitalRead(vstup.pin));
 }
 
 void RelaySwitch(rele_t vstup){
     // precti stav a nastav opacny
-    if (vstup.state == ON){
+    if (vstup.state == 1){
         RelayOff(vstup);
     }
     else{
@@ -370,6 +395,8 @@ void setup(){
     //relaay declaration
     CableHeat.pin = RelayPin1;
     CableHeat.type = NO;
+    Serial.println("CableHeat.type");
+    Serial.println(CableHeat.type);
     pinMode(CableHeat.pin, OUTPUT);
     RelayOff(CableHeat);
 
@@ -494,7 +521,7 @@ void SerialInfo(){
             Serial.println("-------------------Start serial info------------------------");
             Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
             Serial.print("\nTime Stamp (sec): " + String(TimeStamp));
-            Serial.print("\nHeat cable status: " + String(CableHeatState));         Serial.print("\t\tHeater  status: " + String(HeaterState));
+            Serial.print("\nHeat cable status: " + String(CableHeatState)); Serial.print(digitalRead(RelayPin1));         Serial.print("\t\tHeater  status: " + String(HeaterState)); Serial.print(digitalRead(RelayPin2));
             Serial.print("\nWater Temp (water): " + String(AvgWaterTemp));                   //Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
             Serial.print("\nindex current row: ");    Serial.print(CurrentRow);     Serial.print("\tindex target row: ");    Serial.print(TargetRow);
             Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);

@@ -6,10 +6,10 @@
 #include "XPT2046_Touchscreen.h"
 
 // nastavení propojovacích pinů
-#define LCD_cs 10
-#define LCD_dc 8//9
-#define LCD_rst 9//18
-#define DOTYK_cs  7
+#define LCD_cs 37
+#define LCD_dc 38//9
+#define LCD_rst 41//18
+#define DOTYK_cs  36
 
 // inicializace LCD displeje z knihovny
 Adafruit_ILI9340 displej = Adafruit_ILI9340(LCD_cs, LCD_dc, LCD_rst);
@@ -36,7 +36,7 @@ void setup() {
   displej.println("Dotykovy displej");
   displej.setTextSize(3);
   displej.println("2.4 TFT LCD");
-  displej.setTextSize(2);
+  displej.setTextSize(2);a
   displej.println("navody.");
   displej.println("arduino-shop.cz");
 }
