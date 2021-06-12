@@ -47,6 +47,9 @@ bool USE_GAMMA_RGB = false;
 bool USE_GAMMA_WHITE = true;
 bool GET_TEMP = true;
 bool FLOODING_PUMP = false;
+bool RANDOM_TEMP = false;
+
+bool RELAY_DEBUG = false;
 
 
 //water sensor
@@ -187,8 +190,8 @@ U8GLIB_SH1106_128X64 Oled(0x3c);
 typedef struct
 {
     int pin;
-    bool type;  // NO = 0, NC = 1
-    bool state; // ON = 1, OFF = 0
+    int type;  // NO = 0, NC = 1
+    int state; // ON = 1, OFF = 0
 } rele_t;
 
 rele_t CableHeat;
@@ -269,7 +272,7 @@ int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
 //heat
-float TargetTemp = 28;
+float TargetTemp = 24;
 float DeltaT = 0.5;
 int Heat1SafeTemp = 28;
 bool CableHeatState = 0;
@@ -298,53 +301,86 @@ char LightBtnDir = 1;
 
 void RelayOn(rele_t vstup){
     // NO musime zapnout 1
-    Serial.println("RelayOn 1");
-    Serial.println(vstup.state);
-    Serial.println(digitalRead(vstup.pin));
+    if(RELAY_DEBUG){
+        Serial.println("\n\nRelayOn input data");
+        Serial.print("input state ");
+        Serial.println(vstup.state);
+        Serial.print("input pin state ");
+        Serial.println(digitalRead(vstup.pin));
+    }
+    
     if (vstup.type == NO){
         digitalWrite(vstup.pin, HIGH);
-        Serial.println("RelayOn 2");
-        Serial.println(vstup.state);
-        Serial.println(digitalRead(vstup.pin));
+        if(RELAY_DEBUG){
+            Serial.println("\nRelayOn NO");
+            Serial.print("state ");
+            Serial.println(vstup.state);
+            Serial.print("pin state ");
+            Serial.println(digitalRead(vstup.pin));
+        }
     }
     // NC musime zapnout 0
     else{
         digitalWrite(vstup.pin, LOW);
-        Serial.println("RelayOn 3");
-        Serial.println(vstup.state);
-        Serial.println(digitalRead(vstup.pin));
+        if(RELAY_DEBUG){
+            Serial.println("\nRelayOn NC");
+            Serial.print("state ");
+            Serial.println(vstup.state);
+            Serial.print("pin state ");
+            Serial.println(digitalRead(vstup.pin));
+        }
     }
     // nastaveni stavove promenne
     vstup.state = 1;
-    Serial.println("RelayOn 4");
-    Serial.println(vstup.state);
-    Serial.println(digitalRead(vstup.pin));
+    if(RELAY_DEBUG){
+        Serial.println("\nRelayOn output data");
+        Serial.print("output state ");
+        Serial.println(vstup.state);
+        Serial.print("input pin state ");
+        Serial.println(digitalRead(vstup.pin));
+    }
     
 }
 
 void RelayOff(rele_t vstup){
     // NO musime vypnout 0
-    Serial.println("RelayOff 1");
-    Serial.println(vstup.state);
-    Serial.println(digitalRead(vstup.pin));
+    if(RELAY_DEBUG){
+        Serial.println("\n\nRelayOff input data ");
+        Serial.print("input state ");
+        Serial.println(vstup.state);
+        Serial.print("input pin state ");
+        Serial.println(digitalRead(vstup.pin));
+    }
     if (vstup.type == NO){
         digitalWrite(vstup.pin, LOW);
-        Serial.println("RelayOff 2");
-        Serial.println(vstup.state);
-        Serial.println(digitalRead(vstup.pin));
+        if(RELAY_DEBUG){
+            Serial.println("\nRelayOff NO");
+            Serial.print("state ");
+            Serial.println(vstup.state);
+            Serial.print("pin state ");
+            Serial.println(digitalRead(vstup.pin));
+        }
     }
     // NC musime vypnout 1
     else{
         digitalWrite(vstup.pin, HIGH);
-        Serial.println("RelayOff 3");
-        Serial.println(vstup.state);
-        Serial.println(digitalRead(vstup.pin));
+        if(RELAY_DEBUG){
+            Serial.println("\nRelayOff NC");
+            Serial.print("state ");
+            Serial.println(vstup.state);
+            Serial.print("pin state ");
+            Serial.println(digitalRead(vstup.pin));
+        }
     }
     // nastaveni stavove promenne
     vstup.state = 0;
-    Serial.println("RelayOff 4");
-    Serial.println(vstup.state);
-    Serial.println(digitalRead(vstup.pin));
+    if(RELAY_DEBUG){
+        Serial.println("\nRelayOff output data");
+        Serial.print("output state");
+        Serial.println(vstup.state);
+        Serial.print("input pin state ");
+        Serial.println(digitalRead(vstup.pin));
+    }
 }
 
 void RelaySwitch(rele_t vstup){
@@ -395,8 +431,6 @@ void setup(){
     //relaay declaration
     CableHeat.pin = RelayPin1;
     CableHeat.type = NO;
-    Serial.println("CableHeat.type");
-    Serial.println(CableHeat.type);
     pinMode(CableHeat.pin, OUTPUT);
     RelayOff(CableHeat);
 
@@ -417,8 +451,6 @@ void setup(){
 
     Wire.begin();
 
-   
-
     while (!Serial); // Leonardo: wait for serial monitor
     Serial.println("\nI2C Scanner");
     I2CScanner();
@@ -426,9 +458,16 @@ void setup(){
     DiscoverOneWireDevices();
     SensorsDS.begin();
     SerialInfoSetup();
-    delay(500);
     TestRGB();
     Serial.println("------End setup-----");
+    wdt_reset();
+    /*
+    delay(1000);
+    wdt_reset();
+    delay(1000);
+    wdt_reset();
+    delay(1000);
+    */
 }
 
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
@@ -442,12 +481,13 @@ void loop(){
         GetTime();
         RtcCurrentMillis = millis();
     }
-
+    
     LightMode();
     LightBtnRead();
     PrepareShowLight();
 
     GetTemp();
+    InitRelay();
     Heat();
     FirstRun = false;
     TimeRestart();
@@ -560,44 +600,56 @@ void GetTemp(){
     if(GET_TEMP){
         if (NextReadTemp <= millis()){
             ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
-            
-            #ifdef DEBUG
-                Serial.println("******** Start measure temp *******\n");
-            #endif
-            SensorsDS.requestTemperatures();
-            int NumWaterSensor = (sizeof(WaterSensorAddress)/sizeof(WaterSensorAddress[0]));
-            
-            for (byte i = 0; i < NumWaterSensor; i++){
-                WaterTempNoOffset[i] = ReadTemperature(WaterSensorAddress[i]);
-                Serial.println("Water temp without offset is: " + String(WaterTempNoOffset [i]) + "°C. On sensor: " + i);
-                if (( WaterTempNoOffset[i] > -127) && ( WaterTempNoOffset[i] < 85)){
-                    ErrorTempCurrent = 0;
-                    WaterTemp[i] = WaterTempNoOffset[i] + WaterOffset[i];
-                    #ifdef DEBUG
-                        Serial.println("\n--- Temp measure is ok. ---\n");
-                        Serial.println("Water temp with offset on sensor: " + String(i) + " is " + String(WaterTemp[i]) + "°C\n\n");
-                    #endif
-                }
+            if(!RANDOM_TEMP){
+                #ifdef DEBUG
+                    Serial.println("******** Start measure temp *******\n");
+                #endif
+                SensorsDS.requestTemperatures();
+                int NumWaterSensor = (sizeof(WaterSensorAddress)/sizeof(WaterSensorAddress[0]));
                 
-                else if (ErrorTempCurrent < ErrorTempMax)        {
-                    #ifdef DEBUG
-                        Serial.println("Temp measure is FAIL.");
-                        Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
-                    #endif
-                    ErrorTempCurrent++;
+                for (byte i = 0; i < NumWaterSensor; i++){
+                    WaterTempNoOffset[i] = ReadTemperature(WaterSensorAddress[i]);
+                    Serial.println("Water temp without offset is: " + String(WaterTempNoOffset [i]) + "°C. On sensor: " + i);
+                    if (( WaterTempNoOffset[i] > -127) && ( WaterTempNoOffset[i] < 85)){
+                        ErrorTempCurrent = 0;
+                        WaterTemp[i] = WaterTempNoOffset[i] + WaterOffset[i];
+                        #ifdef DEBUG
+                            Serial.println("\n--- Temp measure is ok. ---\n");
+                            Serial.println("Water temp with offset on sensor: " + String(i) + " is " + String(WaterTemp[i]) + "°C\n\n");
+                        #endif
+                    }
+                    
+                    else if (ErrorTempCurrent < ErrorTempMax)        {
+                        #ifdef DEBUG
+                            Serial.println("Temp measure is FAIL.");
+                            Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
+                        #endif
+                        ErrorTempCurrent++;
+                    }
+                    else{
+                        Restart("Lot of error measure. Total: ", ErrorTempCurrent);
+                    }
                 }
-                else{
-                    Restart("Lot of error measure. Total: ", ErrorTempCurrent);
-                }
-            }
 
-            AvgWaterTemp = 0;
-            for (byte i = 0; i < NumWaterSensor; i++){
-                AvgWaterTemp = AvgWaterTemp + WaterTemp[i];
-                Serial.println(WaterTemp[i]);
-                Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C run: " + i);
+                AvgWaterTemp = 0;
+                for (byte i = 0; i < NumWaterSensor; i++){
+                    AvgWaterTemp = AvgWaterTemp + WaterTemp[i];
+                    Serial.println(WaterTemp[i]);
+                    Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C run: " + i);
+                }
+                AvgWaterTemp = AvgWaterTemp / float(NumWaterSensor);
             }
-            AvgWaterTemp = AvgWaterTemp / float(NumWaterSensor);
+            else{
+
+                
+                float min = - 100;
+                float max = + 100;
+                
+                float rand = random(min, max);
+                rand = rand/100;
+                AvgWaterTemp = TargetTemp + rand;
+                Serial.println("randomtemp");
+            }
             NextReadTemp = millis() + TempReadPeriod;
             Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C");
             Serial.println(AvgWaterTemp);
@@ -1119,4 +1171,32 @@ void FloodingPump(){
     }
     GET_TEMP = true;
     FLOODING_PUMP = false;
+}
+
+void InitRelay(){
+    if(FirstRun){
+        RelayOn(CableHeat);
+        delay(50);
+        wdt_reset();
+        RelayOn(Heater);
+        delay(50);
+        wdt_reset();
+        RelayOn(Relay3);
+        delay(50);
+        wdt_reset();
+        RelayOn(Relay4);
+        delay(50);
+        wdt_reset();
+        RelayOff(CableHeat);
+        delay(50);
+        wdt_reset();
+        RelayOff(Heater);
+        delay(50);
+        wdt_reset();
+        RelayOff(Relay3);
+        delay(50);
+        wdt_reset();
+        RelayOff(Relay4);
+    }
+
 }
