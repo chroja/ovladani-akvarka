@@ -31,15 +31,13 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 #include <avr/wdt.h>
 
 // defines
-#define DEBUG
 #define TEMP_OFFSET
 #define RESTART
-#define SERIAL_INFO
 //#define CUSTOM_BOARD
 //#define MESAURE_LED_TEMP
 //#define LIGHT_CURVE_TEST
 
-bool SET_RTC = false;
+bool SET_RTC_SETUP = false;
 bool MESAURE_LIGHT_TEMP = true;
 bool SEARCH_ADDRESS_DS18B20 = true;
 bool TEST_RGB = false;
@@ -49,7 +47,29 @@ bool GET_TEMP = true;
 bool FLOODING_PUMP = false;
 bool RANDOM_TEMP = false;
 
-bool RELAY_DEBUG = false;
+
+
+bool DEBUG_RELAY = false;
+bool DEBUG_INIT_PIN = true;
+bool DEBUG_GET_TIME = true;
+bool DEBUG_SERIAL_INFO_SETUP = true;
+bool DEBUG_SERIAL_INFO = true;
+bool DEBUG_RESTART = true;
+bool DEBUG_GET_TEMP = true;
+bool DEBUG_DISCOVER_ONE_WIRE_DEVICES = false;
+bool DEBUG_HEAT = true;
+bool DEBUG_I2C_SCANNER = true;
+bool DEBUG_OLED_DRAW_PAGES = true;
+bool DEBUG_LIGHT_MODE = true;
+bool DEBUG_LIGHT_BTN_READ = true;
+bool DEBUG_PREPARE_SHOW_LIGHT = true;
+bool DEBUG_SHOW_LIGHT = true;
+bool DEBUG_TEST_RGB = true;
+bool DEBUG_FERTILIZATION = true;
+bool DEBUG_FLOODING_PUMP = true;
+
+
+
 
 
 //water sensor
@@ -144,8 +164,8 @@ int TargetRow;
 
  long FertilizationMap[][4] = {
     // {time, pump, dose (ml), dose into water (l)} - 36000, 0, 4, 100 - 10:00, pump 0, 4ml per 100 l
-    {36000, 0, 7, 100},
-    {33660, 1, 7, 100}
+    {33000, 0, 7, 100},
+    {33600, 1, 7, 100}
 };
 
 unsigned int AquariumVolume = 300; //(l)
@@ -271,7 +291,8 @@ int ErrorTempMax = 20;
 int ErrorTempCurrent = 0;
 int TempReadTime = 1;
 int TempReadPeriod = 15000; //15 sec
-//heat
+
+//heating
 float TargetTemp = 24;
 float DeltaT = 0.5;
 int Heat1SafeTemp = 28;
@@ -301,7 +322,7 @@ char LightBtnDir = 1;
 
 void RelayOn(rele_t vstup){
     // NO musime zapnout 1
-    if(RELAY_DEBUG){
+    if(DEBUG_RELAY){
         Serial.println("\n\nRelayOn input data");
         Serial.print("input state ");
         Serial.println(vstup.state);
@@ -311,7 +332,7 @@ void RelayOn(rele_t vstup){
     
     if (vstup.type == NO){
         digitalWrite(vstup.pin, HIGH);
-        if(RELAY_DEBUG){
+        if(DEBUG_RELAY){
             Serial.println("\nRelayOn NO");
             Serial.print("state ");
             Serial.println(vstup.state);
@@ -322,7 +343,7 @@ void RelayOn(rele_t vstup){
     // NC musime zapnout 0
     else{
         digitalWrite(vstup.pin, LOW);
-        if(RELAY_DEBUG){
+        if(DEBUG_RELAY){
             Serial.println("\nRelayOn NC");
             Serial.print("state ");
             Serial.println(vstup.state);
@@ -332,7 +353,7 @@ void RelayOn(rele_t vstup){
     }
     // nastaveni stavove promenne
     vstup.state = 1;
-    if(RELAY_DEBUG){
+    if(DEBUG_RELAY){
         Serial.println("\nRelayOn output data");
         Serial.print("output state ");
         Serial.println(vstup.state);
@@ -344,7 +365,7 @@ void RelayOn(rele_t vstup){
 
 void RelayOff(rele_t vstup){
     // NO musime vypnout 0
-    if(RELAY_DEBUG){
+    if(DEBUG_RELAY){
         Serial.println("\n\nRelayOff input data ");
         Serial.print("input state ");
         Serial.println(vstup.state);
@@ -353,7 +374,7 @@ void RelayOff(rele_t vstup){
     }
     if (vstup.type == NO){
         digitalWrite(vstup.pin, LOW);
-        if(RELAY_DEBUG){
+        if(DEBUG_RELAY){
             Serial.println("\nRelayOff NO");
             Serial.print("state ");
             Serial.println(vstup.state);
@@ -364,7 +385,7 @@ void RelayOff(rele_t vstup){
     // NC musime vypnout 1
     else{
         digitalWrite(vstup.pin, HIGH);
-        if(RELAY_DEBUG){
+        if(DEBUG_RELAY){
             Serial.println("\nRelayOff NC");
             Serial.print("state ");
             Serial.println(vstup.state);
@@ -374,7 +395,7 @@ void RelayOff(rele_t vstup){
     }
     // nastaveni stavove promenne
     vstup.state = 0;
-    if(RELAY_DEBUG){
+    if(DEBUG_RELAY){
         Serial.println("\nRelayOff output data");
         Serial.print("output state");
         Serial.println(vstup.state);
@@ -411,7 +432,7 @@ void setup(){
     Serial.println("------Start setup-----");
 
     rtc.begin();
-    SetRTC();
+    SetRTCSetup();
 
     FastLED.addLeds<P9813, RGBDataPin, RGBClockPin, RGB>(RBGLights, RGBLightNum); // BGR ordering is typical
     for (int i = 0; i < RGBLightNum; i++){
@@ -430,22 +451,22 @@ void setup(){
 
     //relaay declaration
     CableHeat.pin = RelayPin1;
-    CableHeat.type = NO;
+    CableHeat.type = NC;
     pinMode(CableHeat.pin, OUTPUT);
     RelayOff(CableHeat);
 
     Heater.pin = RelayPin2;
-    Heater.type = NO;
+    Heater.type = NC;
     pinMode(Heater.pin, OUTPUT);
     RelayOff(Heater);
 
     Relay3.pin = RelayPin3;
-    Relay3.type = NO;
+    Relay3.type = NC;
     pinMode(Relay3.pin, OUTPUT);
     RelayOff(Relay3);
 
     Relay4.pin = RelayPin4;
-    Relay4.type = NO;
+    Relay4.type = NC;
     pinMode(Relay4.pin, OUTPUT);
     RelayOff(Relay4);
 
@@ -493,9 +514,8 @@ void loop(){
     TimeRestart();
     ShowOled();
     Fertilization();
-    #ifdef SERIAL_INFO
-        SerialInfo();
-    #endif
+    SerialInfo();
+
    
 }
 
@@ -503,13 +523,15 @@ void loop(){
 void initPin(int Pin, bool State){
     pinMode(Pin, OUTPUT);
     digitalWrite(Pin, State);
-    Serial.print("Init pin: ");     Serial.print(Pin);  Serial.print("\t\tto state: ");     Serial.print(State);    Serial.print("\n");
+    if(DEBUG_INIT_PIN){
+        Serial.print("Init pin: ");     Serial.print(Pin);  Serial.print("\t\tto state: ");     Serial.print(State);    Serial.print("\n");
+    }
 }
 
-void SetRTC(){
-    if (SET_RTC){
+void SetRTCSetup(){
+    if (SET_RTC_SETUP){
         rtc.setDateTime(__DATE__, __TIME__);
-        SET_RTC = false;
+        SET_RTC_SETUP = false;
         Serial.println();
         Serial.println("---------- Time changed ----------");
     }
@@ -531,54 +553,55 @@ void GetTime(){
         TimeM = NTimeM;
         TimeS = NTimeS;
         TimeStamp = (long(TimeH) * 3600) + (long(TimeM) * 60) + long(TimeS);
-        #ifdef DEBUG
-            Serial.println("Correct time read");
-        #endif
+        if(DEBUG_GET_TIME){
+            Serial.println("Correct time read");    
+        }
     }
     else{
-        #ifdef DEBUG
+        if(DEBUG_GET_TIME){
             Serial.println("err time read");
-        #endif
+        }
     }
 }
 
 
 void SerialInfoSetup(){
-    #ifdef DEBUG
+    if(DEBUG_SERIAL_INFO_SETUP){
         Serial.println();
         Serial.println("---------------------SETUP INFO------------------------");
         Serial.println("Version: " + String(__DATE__));
         Serial.println("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
         Serial.println("---------------------END SETUP INFO------------------------");
-    #endif
+    }
 }
 
 void SerialInfo(){
-    #ifdef DEBUG
+    if(DEBUG_SERIAL_INFO){
         if (DEBUG_TimeStamp != TimeStamp){
             Serial.println();
             Serial.println("------------------------------------------------------------");
             Serial.println("-------------------Start serial info------------------------");
             Serial.print("Actual date and time " + String(TimeDay) + '/' + String(TimeMo) + '/' + String(TimeY) + ' ' + String(TimeH) + ":" + String(TimeM) + ":" + String(TimeS));
             Serial.print("\nTime Stamp (sec): " + String(TimeStamp));
-            Serial.print("\nHeat cable status: " + String(CableHeatState)); Serial.print(digitalRead(RelayPin1));         Serial.print("\t\tHeater  status: " + String(HeaterState)); Serial.print(digitalRead(RelayPin2));
-            Serial.print("\nWater Temp (water): " + String(AvgWaterTemp));                   //Serial.print("\t\tT1 Temp (light): " + String(T1Temp));
+            Serial.print("\nWater Temp (water): " + String(AvgWaterTemp));  
+            Serial.print("\nHeat cable status: " + String(CableHeatState)); Serial.print(digitalRead(RelayPin1));         Serial.print("\t\tHeater  status: " + String(HeaterState)); Serial.print(digitalRead(RelayPin2));       
             Serial.print("\nindex current row: ");    Serial.print(CurrentRow);     Serial.print("\tindex target row: ");    Serial.print(TargetRow);
-            Serial.print("\nRed: ");        Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tG PWM: ");  Serial.print(gamma[RedPwm]);
-            Serial.print("\t\tGreen: ");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[GreenPwm]);
-            Serial.print("\t\tBlue: ");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tG PWM: ");  Serial.print(gamma[BluePwm]);
-            Serial.print("\t\tWhite: ");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);     Serial.print(" \tG PWM: ");  Serial.print(gamma[WhitePwm]);
+            Serial.print("\nUse gama for RGB: " + String(USE_GAMMA_RGB) + "\t\tUse gamma for white: " + String(USE_GAMMA_WHITE));
+            Serial.print("\nRed: \t");      Serial.print(map(RedPwm, 0, RedPwmMax, 0, 100));        Serial.print(" % \tPWM: ");     Serial.print(RedPwm);       Serial.print(" \tGAMA PWM: ");  Serial.print(gamma[RedPwm]);
+            Serial.print("\nGreen: \t");    Serial.print(map(GreenPwm, 0, GreenPwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(GreenPwm);     Serial.print(" \tGAMA PWM: ");  Serial.print(gamma[GreenPwm]);
+            Serial.print("\nBlue: \t");     Serial.print(map(BluePwm, 0, BluePwmMax, 0, 100));      Serial.print(" % \tPWM: ");     Serial.print(BluePwm);      Serial.print(" \tGAMA PWM: ");  Serial.print(gamma[BluePwm]);
+            Serial.print("\nWhite: \t");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);     Serial.print(" \tGAMA PWM: ");  Serial.print(gamma[WhitePwm]);
             DEBUG_TimeStamp = TimeStamp;
             Serial.print("\nGet temp: ");     Serial.println(GET_TEMP);
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
             Serial.println("------------------------------------------------------------");
         }
-    #endif
+    }
 }
 
 void Restart(String Message, int Value){
-    #ifdef RESTART
+    if(DEBUG_RESTART){
         Serial.println();
         Serial.print("Why restart device: ");   Serial.print(Message);  Serial.print(" Value: ");   Serial.println(Value);
         Serial.println("--------------------------------------------------------------------------------------");
@@ -586,8 +609,8 @@ void Restart(String Message, int Value){
         Serial.println("--------------------------------------------------------------------------------------");
         Serial.println();   Serial.println();
         delay(500);
-        resetFunc(); //call reset
-    #endif
+    }
+    resetFunc(); //call reset
 }
 
 void TimeRestart(){
@@ -601,9 +624,9 @@ void GetTemp(){
         if (NextReadTemp <= millis()){
             ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
             if(!RANDOM_TEMP){
-                #ifdef DEBUG
+                if(DEBUG_GET_TEMP){
                     Serial.println("******** Start measure temp *******\n");
-                #endif
+                }
                 SensorsDS.requestTemperatures();
                 int NumWaterSensor = (sizeof(WaterSensorAddress)/sizeof(WaterSensorAddress[0]));
                 
@@ -613,17 +636,17 @@ void GetTemp(){
                     if (( WaterTempNoOffset[i] > -127) && ( WaterTempNoOffset[i] < 85)){
                         ErrorTempCurrent = 0;
                         WaterTemp[i] = WaterTempNoOffset[i] + WaterOffset[i];
-                        #ifdef DEBUG
+                        if(DEBUG_GET_TEMP){
                             Serial.println("\n--- Temp measure is ok. ---\n");
                             Serial.println("Water temp with offset on sensor: " + String(i) + " is " + String(WaterTemp[i]) + "°C\n\n");
-                        #endif
+                        }
                     }
                     
                     else if (ErrorTempCurrent < ErrorTempMax)        {
-                        #ifdef DEBUG
+                        if(DEBUG_GET_TEMP){
                             Serial.println("Temp measure is FAIL.");
                             Serial.println("Error Temp counter is: " + String(ErrorTempCurrent + 1) + " / " + String(ErrorTempMax));
-                        #endif
+                        }
                         ErrorTempCurrent++;
                     }
                     else{
@@ -634,8 +657,10 @@ void GetTemp(){
                 AvgWaterTemp = 0;
                 for (byte i = 0; i < NumWaterSensor; i++){
                     AvgWaterTemp = AvgWaterTemp + WaterTemp[i];
-                    Serial.println(WaterTemp[i]);
-                    Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C run: " + i);
+                    if(DEBUG_GET_TEMP){
+                        //Serial.println(WaterTemp[i]);
+                        Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C run: " + i);
+                    }
                 }
                 AvgWaterTemp = AvgWaterTemp / float(NumWaterSensor);
             }
@@ -648,14 +673,18 @@ void GetTemp(){
                 float rand = random(min, max);
                 rand = rand/100;
                 AvgWaterTemp = TargetTemp + rand;
-                Serial.println("randomtemp");
+                if(DEBUG_GET_TEMP){
+                    Serial.println("randomtemp");
+                }
             }
             NextReadTemp = millis() + TempReadPeriod;
-            Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C");
-            Serial.println(AvgWaterTemp);
-            Serial.println("\n******* END measure temp **********");
-            Serial.println();
-            Serial.println();
+            if(DEBUG_GET_TEMP){
+                Serial.println("\nAvg water temp is: " + String(AvgWaterTemp) + "°C");
+                //Serial.println(AvgWaterTemp);
+                Serial.println("\n******* END measure temp **********");
+                Serial.println();
+                Serial.println();
+            }
         } 
     }
 }
@@ -666,26 +695,41 @@ void DiscoverOneWireDevices(void){
         byte present = 0;
         byte data[12];
         byte addr[8];
-
-        Serial.print("Looking for 1-Wire devices...\n\r");
+        if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+            Serial.print("Looking for 1-Wire devices...\n\r");
+        }
         while (oneWireDS.search(addr)){
-            Serial.print("\n\rFound \'1-Wire\' device with address:\n\r");
+            if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                Serial.print("\n\rFound \'1-Wire\' device with address:\n\r");
+            }
             for (i = 0; i < 8; i++){
-                Serial.print("0x");
-                if (addr[i] < 16){
-                    Serial.print('0');
+                if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                    Serial.print("0x");
                 }
-                Serial.print(addr[i], HEX);
+                if (addr[i] < 16){
+                    if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                        Serial.print('0');
+                    }
+                }
+                if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                    Serial.print(addr[i], HEX);
+                }
                 if (i < 7){
-                    Serial.print(", ");
+                    if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                        Serial.print(", ");
+                    }
                 }
             }
             if (OneWire::crc8(addr, 7) != addr[7]){
-                Serial.print("CRC is not valid!\n");
+                if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+                    Serial.print("CRC is not valid!\n");
+                }
                 return;
             }
         }
-        Serial.print("\n\r\n\rThat's it.\r\n");
+        if(DEBUG_DISCOVER_ONE_WIRE_DEVICES){
+            Serial.print("\n\r\n\rThat's it.\r\n");
+        }
         oneWireDS.reset_search();
         delay(500);
         return;
@@ -702,37 +746,37 @@ void Heat(){
         if ((AvgWaterTemp <= TargetTemp) && (CableHeatState != 1)){
             CableHeatState = 1;
             RelayOn(CableHeat);
-            #ifdef DEBUG
+            if(DEBUG_HEAT){
                 Serial.println("Heat cable is on.");
-            #endif
+            }
         }
         else if ((AvgWaterTemp >= (TargetTemp + DeltaT)) && (CableHeatState == 1)){
             CableHeatState = 0;
             RelayOff(CableHeat);
-            #ifdef DEBUG
+            if(DEBUG_HEAT){
                 Serial.println("Heat cable is off. Standart turn off.");
-            #endif
+            }
         }
         if ((AvgWaterTemp <= (TargetTemp - DeltaT)) && (HeaterState != 1)){
             HeaterState = 1;
             RelayOn(Heater);
-            #ifdef DEBUG
+            if(DEBUG_HEAT){
                 Serial.println("Heater in water is on.");
-            #endif
+            }
         }
         else if ((AvgWaterTemp >= TargetTemp) && (HeaterState == 1)){
             HeaterState = 0;
             RelayOff(Heater);
-            #ifdef DEBUG
+            if(DEBUG_HEAT){
                 Serial.println("Heater in water is off.");
-            #endif
+            }
         }
     }
     else    {
         if (FirstRun){
-            #ifdef DEBUG
+            if(DEBUG_HEAT){
                 Serial.println("Temp isn´t read.");
-            #endif
+            }
         }
     }
 }
@@ -740,7 +784,9 @@ void Heat(){
 void I2CScanner(){
     byte error, address;
     int nDevices;
-    Serial.println("Scanning...");
+    if(DEBUG_I2C_SCANNER){
+        Serial.println("Scanning...");
+    }
     nDevices = 0;
     for (address = 1; address < 127; address++){
         // The i2c_scanner uses the return value of
@@ -750,34 +796,55 @@ void I2CScanner(){
         error = Wire.endTransmission();
 
         if (error == 0){
-            Serial.print("I2C device found at address 0x");
-            if (address < 16)
-                Serial.print("0");
-            Serial.print(address, HEX);
-            Serial.println("  !");
+            if(DEBUG_I2C_SCANNER){
+                Serial.print("I2C device found at address 0x");
+            }
+            if (address < 16){
+                if(DEBUG_I2C_SCANNER){
+                    Serial.print("0");
+                }
+            }
+            if(DEBUG_I2C_SCANNER){ 
+                Serial.print(address, HEX);
+                Serial.println("  !");
+            }
 
             nDevices++;
         }
         else if (error == 4){
-            Serial.print("Unknown error at address 0x");
-            if (address < 16)
-                Serial.print("0");
-            Serial.println(address, HEX);
+            if(DEBUG_I2C_SCANNER){
+                Serial.print("Unknown error at address 0x");
+            }
+            if (address < 16){
+                if(DEBUG_I2C_SCANNER){
+                    Serial.print("0");
+                }
+            }
+            if(DEBUG_I2C_SCANNER){
+                Serial.println(address, HEX);
+            }
         }
     }
-    if (nDevices == 0)
-        Serial.println("No I2C devices found\n");
-    else
-        Serial.println("done\n");
+    if (nDevices == 0){
+        if(DEBUG_I2C_SCANNER){
+            Serial.println("No I2C devices found\n");
+        }
+    }
+    else{
+        if(DEBUG_I2C_SCANNER){
+            Serial.println("done\n");
+        }
+    }
 }
-
 void OledDrawPages(){
     if(((OledShowCurrentPage + OledPageShowTime) > LenghtDay) && (TimeStamp < 15)){
         OledShowCurrentPage = TimeStamp;
     }
     if (TimeStamp >= (OledShowCurrentPage + OledPageShowTime)){
         CurrentPage++;
-        Serial.print("Oled - print next page. Print page no. "); Serial.println(CurrentPage);
+        if(DEBUG_OLED_DRAW_PAGES){
+            Serial.print("Oled - print next page. Print page no. "); Serial.println(CurrentPage);
+        }
         OledShowCurrentPage = TimeStamp;
     }
 
@@ -796,7 +863,9 @@ void OledDrawPages(){
         break;
     default:
         CurrentPage = 0;
-        Serial.println("Oled - maximum count for pages overflow. Now set current page to 0.");
+        if(DEBUG_OLED_DRAW_PAGES){
+            Serial.println("Oled - maximum count for pages overflow. Now set current page to 0.");
+        }
         break;
     }
 }
@@ -915,7 +984,9 @@ void LightMode(){
     if (ModeLight == 0){
         if (PrevModeLight != 0){
             PrevModeLight = ModeLight;
-            Serial.println("Light set to off mode.");
+            if(DEBUG_LIGHT_MODE){
+                Serial.println("Light set to off mode.");
+            }
             LightAuto = false;
             RedPwm = 0;
             GreenPwm = 0;
@@ -931,7 +1002,9 @@ void LightMode(){
     else if (ModeLight == 2){
         if (PrevModeLight != 2){
             PrevModeLight = ModeLight;
-            Serial.println("Light set to on mode.");
+            if(DEBUG_LIGHT_MODE){
+                Serial.println("Light set to on mode.");
+            }
             LightAuto = false;
             RedPwm = RedPwmMax;
             GreenPwm = GreenPwmMax;
@@ -947,12 +1020,16 @@ void LightMode(){
     else if (ModeLight == 1){
         if (PrevModeLight != 1){
             PrevModeLight = ModeLight;
-            Serial.println("Light set to auto mode.");
+            if(DEBUG_LIGHT_MODE){
+                Serial.println("Light set to auto mode.");
+            }
         }
         LightAuto = true;
     }
     else{
-        Serial.println("invalid set Led mode");
+        if(DEBUG_LIGHT_MODE){
+            Serial.println("invalid set Led mode");
+        }
     }
 }
 
@@ -967,14 +1044,20 @@ void LightBtnRead (){
             if (!FLOODING_PUMP){
                 ModeLight = ModeLight + LightBtnDir;
                 LightBtnState = digitalRead(LightBtnPin);
-                Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
+                if(DEBUG_LIGHT_BTN_READ){
+                    Serial.println("func LightBtnRead -- ModeLed: " + String(ModeLight));
+                }
                 if((ModeLight == 0) || (ModeLight == 2)){
                     LightBtnDir = LightBtnDir * (-1);
                     if(LightBtnDir > 0){
-                        Serial.println("func LightBtnRead -- next LightBtnDir: +");
+                        if(DEBUG_LIGHT_BTN_READ){
+                            Serial.println("func LightBtnRead -- next LightBtnDir: +");
+                        }
                     }
                     if(LightBtnDir < 0){
-                        Serial.println("func LightBtnRead -- next LightBtnDir: -");
+                        if(DEBUG_LIGHT_BTN_READ){
+                            Serial.println("func LightBtnRead -- next LightBtnDir: -");
+                        }
                     }
                     
                 }
@@ -1013,12 +1096,14 @@ void PrepareShowLight (){
     if((RedPrev != RedCurr) || (GreenPrev != GreenCurr) || (BluePrev != BlueCurr) || (WhitePrev != WhiteCurr)){
         
         ShowLight();
-        Serial.print("\n********** Color Changed **********");
-        Serial.print("\nRed   from: ");     Serial.print(float(RedPrev)/10);       Serial.print(" % \tto: ");   Serial.print(float(RedCurr)/10);      Serial.print(" % \tPWM: ");  Serial.print(RedPwm);    Serial.print(" \tGammma PWM: ");  Serial.print(gamma[RedPwm]);    
-        Serial.print("\nGreen from: ");     Serial.print(float(GreenPrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(GreenCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(GreenPwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[GreenPwm]);
-        Serial.print("\nBlue  from: ");     Serial.print(float(BluePrev)/10);      Serial.print(" % \tto: ");   Serial.print(float(BlueCurr)/10);     Serial.print(" % \tPWM: ");  Serial.print(BluePwm);   Serial.print(" \tGammma PWM: ");  Serial.print(gamma[BluePwm]);
-        Serial.print("\nWhite from: ");     Serial.print(float(WhitePrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(WhiteCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(WhitePwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[WhitePwm]);
-        Serial.print("\n********** Color Changed **********");
+        if(DEBUG_PREPARE_SHOW_LIGHT){
+            Serial.print("\n********** Color Changed **********");
+            Serial.print("\nRed   from: ");     Serial.print(float(RedPrev)/10);       Serial.print(" % \tto: ");   Serial.print(float(RedCurr)/10);      Serial.print(" % \tPWM: ");  Serial.print(RedPwm);    Serial.print(" \tGammma PWM: ");  Serial.print(gamma[RedPwm]);    
+            Serial.print("\nGreen from: ");     Serial.print(float(GreenPrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(GreenCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(GreenPwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[GreenPwm]);
+            Serial.print("\nBlue  from: ");     Serial.print(float(BluePrev)/10);      Serial.print(" % \tto: ");   Serial.print(float(BlueCurr)/10);     Serial.print(" % \tPWM: ");  Serial.print(BluePwm);   Serial.print(" \tGammma PWM: ");  Serial.print(gamma[BluePwm]);
+            Serial.print("\nWhite from: ");     Serial.print(float(WhitePrev)/10);     Serial.print(" % \tto: ");   Serial.print(float(WhiteCurr)/10);    Serial.print(" % \tPWM: ");  Serial.print(WhitePwm);  Serial.print(" \tGammma PWM: ");  Serial.print(gamma[WhitePwm]);
+            Serial.print("\n********** Color Changed **********");
+        }
         RedPrev = RedCurr;
         GreenPrev = GreenCurr;
         BluePrev = BlueCurr;
@@ -1043,14 +1128,18 @@ void ShowLight(){
     else{
         analogWrite(LightWPin, WhitePwm);
     }
-    Serial.print("\nWrite color\n");
+    if(DEBUG_SHOW_LIGHT){
+        Serial.print("\nWrite color\n");
+    }
 
     if((RedPwm > 0) || (GreenPwm > 0) || (BluePwm > 0) || (WhitePwm > 0)){
         LightPumState = 1;
         if(LightPumStatePrev != 1){
             digitalWrite(LightPumpPim, HIGH);
             LightPumStatePrev = LightPumState;
-            Serial.println("Light pump turned on");
+            if(DEBUG_SHOW_LIGHT){
+                Serial.println("Light pump turned on");
+            }
         }
     }
     else if((RedPwm == 0) || (GreenPwm == 0) || (BluePwm == 0) || (WhitePwm == 0)){
@@ -1058,15 +1147,19 @@ void ShowLight(){
         if(LightPumStatePrev != 0){
             digitalWrite(LightPumpPim, LOW);
             LightPumStatePrev = LightPumState;
-            Serial.println("Light pump turned off");
+            if(DEBUG_SHOW_LIGHT){
+                Serial.println("Light pump turned off");
+            }
         }
     }
 }
 
 void TestRGB(){
     if(TEST_RGB){
-        Serial.println("testig rgb");
-        Serial.println("r");
+        if(DEBUG_TEST_RGB){
+            Serial.println("testig rgb");
+            Serial.println("r");
+        }
         for (int i = 0; i < RGBLightNum; i++) {
             RBGLights[i] = CRGB(25, 0, 0);
             FastLED.show();
@@ -1077,7 +1170,9 @@ void TestRGB(){
             RBGLights[i] = CRGB(0, 0, 0);
         }
         FastLED.show();
-        Serial.println("g");
+        if(DEBUG_TEST_RGB){
+            Serial.println("g");
+        }
         for (int i = 0; i < RGBLightNum; i++) {
             RBGLights[i] = CRGB(0, 25, 0);
             FastLED.show();
@@ -1088,7 +1183,9 @@ void TestRGB(){
             RBGLights[i] = CRGB(0, 0, 0);
         }
         FastLED.show();
-        Serial.println("b");
+        if(DEBUG_TEST_RGB){
+            Serial.println("b");
+        }
         for (int i = 0; i < RGBLightNum; i++) {
             RBGLights[i] = CRGB(0, 0, 25);
             FastLED.show();
@@ -1111,30 +1208,36 @@ void Fertilization (){
             }
         }
         if(((TimeStamp+1) >= FertilizationMap[i][0]) && ((TimeStamp) <= FertilizationMap[i][0])){
-            Serial.print("\n\t\t-----Start fertilization-----");
+            if(DEBUG_FERTILIZATION){
+                Serial.print("\n\t\t-----Start fertilization-----");
+            }
             unsigned long FertilizationStartMillis = millis();
             float FertilizationVolume = (AquariumVolume / FertilizationMap[i][3]) * FertilizationMap[i][2];
             unsigned int FertilizationCalibration =  float(FertilizationPumpDef[FertilizationMap[i][1]][2]) / float(FertilizationPumpDef[FertilizationMap[i][1]][1]) * float(1000);
             unsigned long FertilizationTime = FertilizationCalibration * FertilizationVolume;
             int PumpPin = FertilizationPumpDef[FertilizationMap[i][1]][0];
-            
-            Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
-            Serial.print("\nFertilization volume: \t\t");           Serial.print(FertilizationVolume);              Serial.print(" ml"); 
-            Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
-            Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
-
+            if(DEBUG_FERTILIZATION){
+                Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
+                Serial.print("\nFertilization volume: \t\t");           Serial.print(FertilizationVolume);              Serial.print(" ml"); 
+                Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
+                Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
+            }
             while (millis() < (FertilizationStartMillis + FertilizationTime)){
                 //code tento while to nesmí opustit  dokud nebude pohnojeno
                 digitalWrite(PumpPin, HIGH);
-                Serial.print(".");
+                if(DEBUG_FERTILIZATION){
+                    Serial.print(".");
+                }
                 delay(100);
                 wdt_reset(); 
             }
 
             digitalWrite(PumpPin, LOW);
             GET_TEMP = true;
-            Serial.print("\n\t\t-----End fertilization-----");
-            Serial.print("\n");
+            if(DEBUG_FERTILIZATION){
+                Serial.print("\n\t\t-----End fertilization-----");
+                Serial.print("\n");
+            }
         }
     }
 }
@@ -1145,29 +1248,34 @@ void FloodingPump(){
         if(GET_TEMP){
             GET_TEMP = false;
         }
-        Serial.print("\n\t\t-----Start flooding fertilization-----");
+        if(DEBUG_FLOODING_PUMP){
+            Serial.print("\n\t\t-----Start flooding fertilization-----");
+        }
         unsigned long FertilizationStartMillis = millis();
         unsigned int FertilizationCalibration =  float(FertilizationPumpDef[FertilizationMap[i][1]][2]) / float(FertilizationPumpDef[FertilizationMap[i][1]][1]) * float(1000);
         unsigned long FertilizationTime = FertilizationCalibration * FloodingVolume;
         int PumpPin = FertilizationPumpDef[FertilizationMap[i][1]][0];
-
-        Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
-        Serial.print("\nFlooding volume: \t\t");                Serial.print(FloodingVolume);                   Serial.print(" ml"); 
-        Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
-        Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
-
+        if(DEBUG_FLOODING_PUMP){
+            Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
+            Serial.print("\nFlooding volume: \t\t");                Serial.print(FloodingVolume);                   Serial.print(" ml"); 
+            Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
+            Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
+        }
         while (millis() < (FertilizationStartMillis + FertilizationTime)){
             //code tento while to nesmí opustit  dokud nebude pohnojeno
             digitalWrite(PumpPin, HIGH);
-            Serial.print(".");
+            if(DEBUG_FLOODING_PUMP){
+                Serial.print(".");
+            }
             delay(100);
             wdt_reset(); 
         }
 
         digitalWrite(PumpPin, LOW);
-        
-        Serial.print("\n\t\t-----End fertilization-----");
-        Serial.print("\n");
+        if(DEBUG_FLOODING_PUMP){
+            Serial.print("\n\t\t-----End fertilization-----");
+            Serial.print("\n");
+        }
     }
     GET_TEMP = true;
     FLOODING_PUMP = false;
