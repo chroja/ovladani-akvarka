@@ -38,7 +38,7 @@ int numCols = sizeof(LightCurve[0])/sizeof(LightCurve[0][0]);
 //#define LIGHT_CURVE_TEST
 
 bool SET_RTC_SETUP = false;
-bool MESAURE_LIGHT_TEMP = true;
+bool MESAURE_LIGHT_TEMP = false;
 bool SEARCH_ADDRESS_DS18B20 = true;
 bool TEST_RGB = false;
 bool USE_GAMMA_RGB = false;
@@ -67,6 +67,7 @@ bool DEBUG_SHOW_LIGHT = true;
 bool DEBUG_TEST_RGB = true;
 bool DEBUG_FERTILIZATION = true;
 bool DEBUG_FLOODING_PUMP = true;
+
 
 
 
@@ -247,8 +248,8 @@ int WhitePwm = 0;
 int WhitePwmMax = 255;//205;
 
 bool LightAuto = true;
-byte ModeLight = 1; // 0 = off; 1 = auto; 2 = off
-byte PrevModeLight = 0;
+int ModeLight = 1; // 0 = off; 1 = auto; 2 = on
+int PrevModeLight = 0;
 bool LightPumState = 0;
 bool LightPumStatePrev = 0;
 
@@ -319,6 +320,8 @@ RTCDateTime DateTime;
 bool LightBtnState = 0;
 bool PrevLightBtnState = 0;
 char LightBtnDir = 1;
+
+String SerialCommand;
 
 void RelayOn(rele_t vstup){
     // NO musime zapnout 1
@@ -480,6 +483,8 @@ void setup(){
     SensorsDS.begin();
     SerialInfoSetup();
     TestRGB();
+
+    Serial.print("\nRANDOM_TEMP: ");     Serial.println(RANDOM_TEMP);
     Serial.println("------End setup-----");
     wdt_reset();
     /*
@@ -496,7 +501,10 @@ void(* resetFunc) (void) = 0; //declare reset function @ address 0
 //****************************************** LOOP ****************************************
 
 void loop(){
-    wdt_reset(); // make sure this gets called at least once every 8 seconds!
+    wdt_reset(); // make sure this gets called at least once every 2 seconds!
+    if(FirstRun){
+        FirstRunFunc();
+    }
 
     if (millis() >= (RtcCurrentMillis + 1000)){
         GetTime();
@@ -508,13 +516,14 @@ void loop(){
     PrepareShowLight();
 
     GetTemp();
-    InitRelay();
+    //InitRelay();
     Heat();
     FirstRun = false;
     TimeRestart();
     ShowOled();
     Fertilization();
     SerialInfo();
+    GetSerial();
 
    
 }
@@ -593,6 +602,7 @@ void SerialInfo(){
             Serial.print("\nWhite: \t");    Serial.print(map(WhitePwm, 0, WhitePwmMax, 0, 100));    Serial.print(" % \tPWM: ");     Serial.print(WhitePwm);     Serial.print(" \tGAMA PWM: ");  Serial.print(gamma[WhitePwm]);
             DEBUG_TimeStamp = TimeStamp;
             Serial.print("\nGet temp: ");     Serial.println(GET_TEMP);
+            Serial.print("\nRANDOM_TEMP: ");     Serial.println(RANDOM_TEMP);
             Serial.println();
             Serial.println("-------------------End serial info--------------------------");
             Serial.println("------------------------------------------------------------");
@@ -623,7 +633,7 @@ void GetTemp(){
     if(GET_TEMP){
         if (NextReadTemp <= millis()){
             ShowLight(); //pokud dojde k chybě rozsvícení ledek, tak při měření teploty se opraví
-            if(!RANDOM_TEMP){
+            if(RANDOM_TEMP != 1){
                 if(DEBUG_GET_TEMP){
                     Serial.println("******** Start measure temp *******\n");
                 }
@@ -1217,7 +1227,7 @@ void Fertilization (){
             unsigned long FertilizationTime = FertilizationCalibration * FertilizationVolume;
             int PumpPin = FertilizationPumpDef[FertilizationMap[i][1]][0];
             if(DEBUG_FERTILIZATION){
-                Serial.print("\nPump: \t\t\t\t\t\t");                   Serial.print(FertilizationMap[i][1]);            
+                Serial.print("\nPump: \t\t\t\t\t");                     Serial.print(FertilizationMap[i][1]);            
                 Serial.print("\nFertilization volume: \t\t");           Serial.print(FertilizationVolume);              Serial.print(" ml"); 
                 Serial.print("\nFertilization Calibration: \t");        Serial.print(FertilizationCalibration);         Serial.print(" ms/ml");
                 Serial.print("\nTotal time fertilization: \t");         Serial.print(float(FertilizationTime)/1000);    Serial.print(" s\n");
@@ -1281,8 +1291,9 @@ void FloodingPump(){
     FLOODING_PUMP = false;
 }
 
-void InitRelay(){
+void FirstRunFunc(){
     if(FirstRun){
+        Serial.println("*********FirstRunFunc*********\n");
         RelayOn(CableHeat);
         delay(50);
         wdt_reset();
@@ -1305,6 +1316,204 @@ void InitRelay(){
         delay(50);
         wdt_reset();
         RelayOff(Relay4);
+
+        Serial.print("RANDOM_TEMP "); Serial.println(RANDOM_TEMP);
+    
+
+
+        Serial.println("*********FirstRunFunc*********");
+    }
+}
+
+void GetSerial(){
+    // read from port 1, send to port 0:
+    if (Serial.available()) {
+        char c = Serial.read(); {
+        if (c ==  '\n') {
+            ParseSerial(SerialCommand);
+            SerialCommand = "";
+        }
+        else {
+            SerialCommand += c;
+
+        }
+    }
+  }
+}
+
+void ParseSerial(String com){
+    String Variable; 
+    String Value;
+    Variable = com.substring(0, com.indexOf("="));
+    Value = com.substring(com.indexOf("=") + 1);
+    
+    if(Variable == "SEARCH_ADDRESS_DS18B20"){
+        Serial.println("Current value for " + Variable + " is: " + String(SEARCH_ADDRESS_DS18B20));
+        SEARCH_ADDRESS_DS18B20 = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(SEARCH_ADDRESS_DS18B20));
+    }
+    else if(Variable == "TEST_RGB"){
+        Serial.println("Current value for " + Variable + " is: " + String(TEST_RGB));
+        TEST_RGB = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(TEST_RGB));
+    }
+    else if(Variable == "USE_GAMMA_RGB"){
+        Serial.println("Current value for " + Variable + " is: " + String(USE_GAMMA_RGB));
+        USE_GAMMA_RGB = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(USE_GAMMA_RGB));
+    }
+    else if(Variable == "USE_GAMMA_WHITE"){
+        Serial.println("Current value for " + Variable + " is: " + String(USE_GAMMA_WHITE));
+        USE_GAMMA_WHITE = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(USE_GAMMA_WHITE));
+    }
+    else if(Variable == "GET_TEMP"){
+        Serial.println("Current value for " + Variable + " is: " + String(GET_TEMP));
+        GET_TEMP = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(GET_TEMP));
+    }
+    else if(Variable == "FLOODING_PUMP"){
+        Serial.println("Current value for " + Variable + " is: " + String(FLOODING_PUMP));
+        FLOODING_PUMP = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(FLOODING_PUMP));
+    }
+    else if(Variable == "RANDOM_TEMP"){
+        Serial.println("Current value for " + Variable + " is: " + String(RANDOM_TEMP));
+        RANDOM_TEMP = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(RANDOM_TEMP));
+    }/* *********** debugs *************
+    else if(Variable == "DEBUG_RELAY"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_RELAY));
+        DEBUG_RELAY = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_RELAY));
+    }
+    else if(Variable == "DEBUG_INIT_PIN"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_INIT_PIN));
+        DEBUG_INIT_PIN = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_INIT_PIN));
+    }
+    else if(Variable == "DEBUG_GET_TIME"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_GET_TIME));
+        DEBUG_GET_TIME = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_GET_TIME));
+    }
+    else if(Variable == "DEBUG_SERIAL_INFO_SETUP"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_SERIAL_INFO_SETUP));
+        DEBUG_SERIAL_INFO_SETUP = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_SERIAL_INFO_SETUP));
+    }
+    else if(Variable == "DEBUG_SERIAL_INFO"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_SERIAL_INFO));
+        DEBUG_SERIAL_INFO = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_SERIAL_INFO));
+    }
+    else if(Variable == "DEBUG_RESTART"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_RESTART));
+        DEBUG_RESTART = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_RESTART));
+    }
+    else if(Variable == "DEBUG_GET_TEMP"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_GET_TEMP));
+        DEBUG_GET_TEMP = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_GET_TEMP));
+    }
+    else if(Variable == "DEBUG_DISCOVER_ONE_WIRE_DEVICES"){
+        Serial.println("Current value for " + Variable + " is: " + String(DEBUG_DISCOVER_ONE_WIRE_DEVICES));
+        DEBUG_DISCOVER_ONE_WIRE_DEVICES = Value.toInt();
+        Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_DISCOVER_ONE_WIRE_DEVICES));
+    }
+    else if(Variable == "DEBUG_HEAT"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_HEAT));
+        DEBUG_HEAT = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_HEAT));
+    }
+    else if(Variable == "DEBUG_I2C_SCANNER"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_I2C_SCANNER));
+        DEBUG_I2C_SCANNER = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_I2C_SCANNER));
+    }
+    else if(Variable == "DEBUG_OLED_DRAW_PAGES"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_OLED_DRAW_PAGES));
+        DEBUG_OLED_DRAW_PAGES = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_OLED_DRAW_PAGES));
+    }
+    else if(Variable == "DEBUG_LIGHT_MODE"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_LIGHT_MODE));
+        DEBUG_LIGHT_MODE = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_LIGHT_MODE));
+    }
+    else if(Variable == "DEBUG_LIGHT_BTN_READ"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_LIGHT_BTN_READ));
+        DEBUG_LIGHT_BTN_READ = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_LIGHT_BTN_READ));
+    }
+    else if(Variable == "DEBUG_PREPARE_SHOW_LIGHT"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_PREPARE_SHOW_LIGHT));
+        DEBUG_PREPARE_SHOW_LIGHT = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_PREPARE_SHOW_LIGHT));
+    }
+    else if(Variable == "DEBUG_SHOW_LIGHT"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_SHOW_LIGHT));
+        DEBUG_SHOW_LIGHT = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_SHOW_LIGHT));
+    }
+    else if(Variable == "DEBUG_TEST_RGB"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_TEST_RGB));
+        DEBUG_TEST_RGB = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_TEST_RGB));
+    }
+    else if(Variable == "DEBUG_FERTILIZATION"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_FERTILIZATION));
+        DEBUG_FERTILIZATION = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_FERTILIZATION));
+    }
+    else if(Variable == "DEBUG_FLOODING_PUMP"){
+            Serial.println("Current value for " + Variable + " is: " + String(DEBUG_FLOODING_PUMP));
+        DEBUG_FLOODING_PUMP = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(DEBUG_FLOODING_PUMP));
+    }*/
+
+
+
+
+    else if(Variable == "FloodingVolume"){
+            Serial.println("Current value for " + Variable + " is: " + String(FloodingVolume));
+        FloodingVolume = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(FloodingVolume));
+    }
+    else if(Variable == "RedPwmMax"){
+            Serial.println("Current value for " + Variable + " is: " + String(RedPwmMax));
+        RedPwmMax = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(RedPwmMax));
+    }
+    else if(Variable == "GreenPwmMax"){
+            Serial.println("Current value for " + Variable + " is: " + String(GreenPwmMax));
+        GreenPwmMax = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(GreenPwmMax));
+    }
+    else if(Variable == "BluePwmMax"){
+            Serial.println("Current value for " + Variable + " is: " + String(BluePwmMax));
+        BluePwmMax = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(BluePwmMax));
+    }
+    else if(Variable == "WhitePwmMax"){
+            Serial.println("Current value for " + Variable + " is: " + String(WhitePwmMax));
+        WhitePwmMax = Value.toInt();
+            Serial.println("Value for " + Variable + " changed to: " + String(WhitePwmMax));
+    }
+    else if(Variable == "ModeLight"){
+            Serial.println("Current value for " + Variable + " is: " + String(ModeLight));
+        ModeLight = Value.toInt();
+        ModeLight == 1 ? LightAuto = true : LightAuto = false;
+            Serial.println("Value for " + Variable + " changed to: " + String(ModeLight));
+    }
+
+
+
+
+    else{
+
     }
 
 }
+
